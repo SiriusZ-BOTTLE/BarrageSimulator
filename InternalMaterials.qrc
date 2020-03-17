@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/materials/charactors">
+        <file>RESOURCES/block_zero.png</file>
+    </qresource>
+    <qresource prefix="/materials/bullets">
+        <file>RESOURCES/bullet_type0_blue.png</file>
+    </qresource>
+</RCC>
