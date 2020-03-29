@@ -1,9 +1,9 @@
 #ifndef CORE_H
 #define CORE_H
 
-//标准库
-#include <iostream>
+
 //QT核心库
+#include <QtCore/qmath.h>
 #include <QString>
 #include <QVector>
 #include <QGraphicsItem>
@@ -14,9 +14,8 @@
 #include <QThread>
 #include <QTimer>
 #include <QEventLoop>
-#include <QtCore/qmath.h>
-#include <cmath>
-#include <chrono>
+#include <QBitmap>
+
 #include <QMetaType>
 #include <QLabel>
 #include <QGridLayout>
@@ -24,16 +23,25 @@
 #include <QMutex>//互斥量
 #include <QMutexLocker>//RAII
 #include <QReadWriteLock>//读写锁
-#include <QReadLocker>//RAII
-#include <QWriteLocker>//RAII
+#include <QReadLocker>//RAII锁
+#include <QWriteLocker>//RAII锁
 //json
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonParseError>
 #include <QJsonArray>
 #include <QJsonObject>
-
+//OGL
 #include <QOpenGLContext>
 #include <QOpenGLBuffer>
 #include <QGL>
+//压缩包读取
+#include <QtZlib/zlib.h>
 
+//C++标准库
+#include <cmath>
+#include <chrono>
+#include <iostream>
 
 #if defined(_WIN32)
 #if defined(_MSC_VER)
@@ -46,23 +54,21 @@
 #endif
 
 
-
-
 /*
  *  核心头文件
  */
+//前导声明
+class ObjectsControl;
 
-
-//弹幕模拟器
+///弹幕模拟器核心
 namespace Core
 {
     //前导声明
     namespace Objects
     {
         class FlyingObject;
-        class HitObject;
+        class ManipulableObject;
     }
-
 
     ///定义集合
     namespace Definition
@@ -75,8 +81,8 @@ namespace Core
     using BinaryVector =std::pair<type,type>;
 //    using ptr=type*;
 
-
-    constexpr Decimal PI=3.1415926535897;
+    ///通用常量
+    constexpr Decimal PI=3.1415926535897;//圆周率
     constexpr Decimal R2D=180/PI;//弧度转角度
     constexpr Decimal D2R=PI/180;//角度转弧度
 
@@ -84,21 +90,23 @@ namespace Core
     enum Key
     {
         //Player0
-        P0_UP,
+        P0_UP,//移动
         P0_DOWN,
         P0_LEFT,
         P0_RIGHT,
         P0_FIRE,//fire
         P0_SP,//特殊
         P0_IACT,//交互(interaction)
+
         //Player1
-        P1_UP,
+        P1_UP,//移动
         P1_DOWN,
         P1_LEFT,
         P1_RIGHT,
         P1_FIRE,//fire
         P1_SP,//特殊
         P1_IACT,//交互
+
         //其它按键
         ML,//鼠标左键
         MR,//鼠标右键
@@ -111,7 +119,7 @@ namespace Core
     enum class MovementMode
     {
         Stop,//自动停止(立即消除加速度大小, 自动速度衰减)
-        TowardsTarget,//朝向目标(自动位移至目标位置)
+        TowardsTarget,//朝向目标(自动位移至目标位置)(暂未实现)
         Unlimited//无限制(使用加速度, 速度等物理量计算位置)
     };
 
@@ -129,40 +137,59 @@ namespace Core
 
     class DeriveRule;
 
+    ///内置碰撞频道
+    enum InnerChannnel
+    {
+        DefaultChannel=0,//默认频道
+        PlayerManipulation,//player操纵
+        ProgramManipulation,//程序操纵
+    };
+
+
     ///对象控制属性
     class ObjectControlProperty//聚合类
     {
     public:
-        Integer lifetime{-1};//生命周期(小于0时持续存在, 等于0时会被释放)
-        bool flag_end{false};//生命周期结束标记
+        Integer lifetime{-1};//生命周期(小于0时持续存在, 等于0时生命结束)
+        Integer channel_collision{0};//碰撞频道(处于不同频道的对象会产生碰撞)
+//        Integer subchannel_collision{0};//子碰撞频道(碰撞频道和子碰撞频道同时相同时不会发生碰撞, 否则会发生碰撞)
+        bool flag_end{false};//生命周期结束标记(为false时会被释放)
         bool flag_delete_outside_scene{true};//是否在场景外应该被释放的标记
         bool flag_boundary_restriction{false};//边界限制
-        bool flag_collision{true};//是否考虑碰撞的标记
-        bool flag_drive{false};//是否处于可以派生的状态
+        bool flag_collision{true};//是否考虑碰撞的标记(默认考虑碰撞, 为false时不会受到任何碰撞)
+        bool flag_channel_collision{false};//同频道是否发生碰撞的标记(默认处于同一频道不会发生碰撞)
+        bool flag_drive{false};//是否处于可以派生新对象的状态
         int cooldown_highlight{0};//高亮冷却, 到0的时候取消高亮效果
         int cooldown_drive{0};//派生冷却, 到0的时候才能继续派生
+        int number_rest_collision{1};//剩余碰撞次数(碰撞时数量-1, 到0时结束生命)
         DeriveRule * rule{nullptr};//生成规则
+        DeriveRule * rule_on_collision{nullptr};//碰撞时的生成规则
+        DeriveRule * rule_on_destyoy{nullptr};//被析构时的生成规则
 
         Integer count_drive{0};//派生次数
 
         Decimal mass{1};//质量(用于计算碰撞后速度)
+        Decimal inertia_rotational{1};//转动惯量(用于计算碰撞后的旋转速度)
+        Decimal elasticity{1.0};//弹性(用于计算碰撞后轴向的动能损失, 弹性为1则不损失动能)
         BinaryVector<Decimal> coordinate{0,0};//坐标(横坐标, 纵坐标)
         BinaryVector<Decimal> target_aming{0,0};//指向目标
         BinaryVector<Decimal> target_moving{0,0};//移动目标
         ///位移运动相关
-        MovementMode mode_movement{MovementMode::Stop};//默认自动停止
+        MovementMode mode_movement{MovementMode::Stop};//位移模式(默认自动停止)
 
         //速度
         Decimal velocity_max{0};//最大速率限制
-        BinaryVector<Decimal> speed_polar{0,0};//极坐标(速度大小, 速度方向)(弧度制)
-        BinaryVector<Decimal> speed_axis{0,0};//轴坐标(水平速度, 垂直速度)
         Decimal acceleration_max{0};//最大加速度限制(player操纵对象运动时默认使用最大加速度进行加速)
         Decimal attenuation_velocity{0};//速度衰减(减速时的加速度大小)
+        BinaryVector<Decimal> speed_polar{0,0};//极坐标(速度大小, 速度方向)(弧度制)
+        BinaryVector<Decimal> speed_axis{0,0};//轴坐标(水平速度, 垂直速度)
+
         //加速度
         BinaryVector<Decimal> acceleration_polar{0,0};//极坐标(加速度大小, 加速度方向)(弧度制)
         BinaryVector<Decimal> acceleration_axis{0,0};//轴坐标(水平加速度, 垂直加速度)
 
         ///刚体(定轴)旋转相关(角度制)
+//        QPointF center{0.0,0.0};//中心
         RotationMode mode_rotation{RotationMode::Fixed};//旋转模式(默认固定位置不旋转)
 
         Decimal coefficient_friction{1};//摩擦系数
@@ -175,9 +202,10 @@ namespace Core
         ObjectControlProperty()=default;
         //复制构造函数
         ObjectControlProperty(const ObjectControlProperty&)=default;
-        //初始化, 设置数据后必须手动初始化
-        void init();
+        //初始化, 设置数据后必须手动初始化(不用手动初始化, FlyingObject在初始化时会初始化本对象)
+        void initialize();
         //计算惯性旋转角(全力减速时仍然会滑行的角度)
+    private:
         void get_inertial_rotation_angle();
 
     };
@@ -188,9 +216,7 @@ namespace Core
     {
     public:
         bool flag_team_kill{false};//同队伍伤害
-        int team{0};//队伍号
-        int index_bullet_series{0};//系列索引
-        int index_bullet_level{0};//等级索引
+        Integer channel_damage{0};//伤害频道
         BinaryVector<Decimal> endurance{0,0};//耐久/最大耐久
         Decimal damage{0};//伤害
         Decimal resist{0};//抵抗/阻挡
@@ -224,7 +250,8 @@ namespace Core
         BinaryVector<Decimal> speed{0,0};//初始速度(极坐标, 若大小小于0, 则使用最大速度)
         BinaryVector<Decimal> acceleration{0,0};//初始加速度(极坐标, 若大小小于0, 则使用最大加速度)
         Decimal rotation{0.0};//初始角度
-        Decimal rotation_float{0};//方向浮动百分比
+        Decimal rotation_float{0.0};//方向浮动百分比(确定了方向之后进行浮动)
+        Decimal probability{1.0};//派生概率[0.0,1.0]
     };
 
     ///派生规则
@@ -233,21 +260,21 @@ namespace Core
     public:
         int period;//派生最速周期
         QVector<DeriveUnit> units;
+        DeriveRule * next{nullptr};//下一个派生规则
     };
 
-    //对象类型
+    ///对象类型
     //一共三种类型
     enum class ObjectType
     {
         FlyingObject,//飞行对象
-        HitObject,//碰撞对象
         ManipulableObject,//可操纵对象
         End_ObjectType//哨兵
     };
     }
 
-    ///工具函数
-    namespace ToolFunctions
+    ///工具函数包
+    namespace ToolFunctionsKit
     {
     using namespace Definition;
 
@@ -261,6 +288,7 @@ namespace Core
 
     using namespace Definition;
 
+    ///对象
     namespace Objects
     {
 //    using namespace Definition;
@@ -268,36 +296,64 @@ namespace Core
     using Definition::ObjectControlProperty;
     using Definition::ObjectGamingProperty;
 
+    //前导声明
     class FlyingObject;
-    ///元素, 屏幕上的基本显示单元
+
+
+    ///元素
     class Element: public QGraphicsPixmapItem
     {
     public:
-        FlyingObject * parent{nullptr};//指向本对象的管理对象
+        FlyingObject * obj_manage{nullptr};//指向本对象的管理对象
+        Element * ele_last_collisio{nullptr};//指向上一次碰撞的对象
         int number_frame{0};//帧数
-        int period_frame{0};
+        int period_frame{0};//周期
         int cooldown_next_frame{0};//下一帧冷却
         int frame_current{0};//当前帧
         QVector<QPixmap> frames{};//从原图上剪切下来的不同帧, 作为动画播放
+//        QPointF offset{0.0,0.0};//偏移量
+//        QRectF rect_bounding{};//边界矩形
     public:
+        Element()=delete;
         //构造函数, 指定图片, 指定帧数, 周期
-        Element(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=2);
-        //复制构造函数(复制构造时不会复制父对象指针)
+        Element(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10);
+        //复制构造函数(复制构造时不会复制父对象指针, 注意基类的复制构造函数被显式删除了)
         Element(const Element&ano);
-        void next_frame();//显示下一帧
+        //显示下一帧
+        void next_frame();
+
+        void set_frames(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10);
+        //设置偏移量(中心)
+//        void set_offset(const QPointF &offset);
+
+        //重写item碰撞检测
+        bool collidesWithItem
+        (const QGraphicsItem *other, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape)const override;
+        //重写绘制函数
+//        void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+        //重写形状获取函数
+//        QPainterPath shape() const override;
+        //重写边界矩形获取函数
+//        QRectF boundingRect() const override;
     };
 
     ///飞行对象
-    //可以是组, 可以是单个元素, 支持嵌套
+    //可以是组, 可以是单个元素, 支持嵌套, 可以碰撞
     class FlyingObject
     {
+        friend class ::ObjectsControl;//友元类
+    private:
+        static Integer seq;
     public:
-        QString name{"Undefined"};//名称
+        ObjectControlProperty property{};//基本属性
+
+    protected:
+        Integer id{0};//id号, 唯一全局标识符(执行构造函数时自动设置, 无需手动设置)
+        Integer id_last_collision{-1};//上一个发生碰撞的对象的id号
+        QString _name{"Undefined"};//名称
         QGraphicsItem * item{nullptr};//项指针或者组指针
         ObjectType type{ObjectType::FlyingObject};//飞行对象类型
         bool flag_group{false};//是否为群组的标记
-
-        ObjectControlProperty property{};//基本属性
         QList<FlyingObject*> items_sub{};//次级对象
 
     public:
@@ -305,41 +361,98 @@ namespace Core
         FlyingObject();
         //构造函数, 指定名称
         explicit FlyingObject(const QString& name);
-        //析构函数(虚)
-        virtual ~FlyingObject();
         //复制构造函数
         FlyingObject(const FlyingObject&ano);
+        //析构函数(虚)
+        virtual ~FlyingObject();
     public:
+        const QString &name()const;
+        void set_name(const QString &_name);
+
         //添加到场景
         void add_to_scene(QGraphicsScene *scene);
         //设置元素
         void set_element(Element*ele);
+        //设置元素(重载)
+        void set_element(Element*ele,const QPointF center);
         //添加次级对象
         void add_sub_objects(FlyingObject *obj_sub);
-        //设置
-
-        void set_derive_rule(DeriveRule * rule);
+        //初始化
+        void initialize();
     };
 
-    ///碰撞对象: 公有继承 飞行对象
-    class HitObject: public FlyingObject
+    ///可操纵对象: 公有继承 飞行对象
+    class ManipulableObject: public FlyingObject
     {
-    public:
         using FlyingObject::FlyingObject;//使用基类的全部构造函数
+        friend class ::ObjectsControl;//友元类
+    public:
         ObjectGamingProperty property_gaming{};//gaming状态属性
     public:
         //构造函数
-        HitObject();
+        ManipulableObject();
         //复制构造函数
-        HitObject(const HitObject&ano);
+        ManipulableObject(const ManipulableObject&ano);
     };
 
     //可操纵对象
-    using ManipulableObject=HitObject;
+//    using ManipulableObject=ManipulableObject;
 
     }
 
     using namespace Core::Objects;
+
+    ///game
+    namespace Game
+    {
+        ///资源包-对应硬盘上的一个压缩包
+        class ResourcePackage
+        {
+        private:
+            //包路径
+            QString path_pkg{"Undefined"};
+            //资源映射<资源名称, 资源路径>
+            std::map<QString, QString> map_file;
+
+            //包内的全部图片资源
+            std::vector<QPixmap> pixmaps{};
+            //包内元素
+            std::vector<Element> elements{};
+            //对象
+            std::vector<ManipulableObject> objects{};
+            //派生规则
+            std::vector<DeriveRule>rules_derive{};
+
+        public:
+            //构造函数(私有, 无法手动构造)
+            ResourcePackage();
+
+        public:
+            //加载目标目录下的文件
+            void load(const QString &path);
+
+        private:
+            //解析对象json文件
+            FlyingObject * parse_json__object(const QString &path);
+            //解析生成规则json文件
+            DeriveRule * parse_json__derive_rule(const QString &path);
+
+        };
+
+
+
+        ///场景(待完成)
+        class Scene
+        {
+        private:
+            QPoint size{500,500};//场景总大小(单位: 像素)
+
+
+        };
+
+
+    }
+
 
     ///运行时数据
     class RunTimeData
@@ -373,7 +486,7 @@ namespace Core
 
 }
 
-//全局设置
+///全局设置
 namespace Settings
 {
 using namespace Core;
@@ -399,6 +512,8 @@ using namespace Core;
     extern int count_frames;//统计平均时统计的帧数
 
     extern int size_font;//字体大小
+
+    extern Definition::Decimal distance_mutex;//互斥距离
 
     //键盘映射(键码映射), 通过映射到功能键位上
     extern QMap<unsigned,Definition::Key> map_keys;

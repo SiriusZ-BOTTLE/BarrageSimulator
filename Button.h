@@ -4,7 +4,6 @@
 #include <QPushButton>
 #include <QDebug>
 
-#include "Core.h"
 
 class Button : public QPushButton
 {

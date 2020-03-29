@@ -2,12 +2,9 @@
 #define GAMINGWIDGET_H
 
 
-#include <Core.h>
-#include <InnerData.h>
-#include <Graphics.h>
-
-
-#include "MainWindow.h"
+#include "Core.h"
+#include "InnerData.h"
+#include "Graphics.h"
 #include "Button.h"
 
 
@@ -19,9 +16,9 @@ using namespace InnerData;
 extern RunTimeData data_runtime;
 extern GraphicsScene * scene_main;//主场景
 
+//前导声明
+class MainWindow;
 
-
-class MainWindow;//前导声明
 ///状态栏信息
 struct StatusBarInfo
 {
@@ -39,7 +36,8 @@ class ObjectsControl: public QObject
     Q_OBJECT
 public:
     int count{0};
-    enum Status
+
+    enum Status//!废弃
     {
         Running,//运行
         Pause,//暂停
@@ -47,14 +45,20 @@ public:
         End_Status//哨兵
     };
 
+
 public:
     Status status{Pause};
+    //处理数据
+    static void process_data();
+    //管理对象对象
+    static void manage_objects();
+    //更新属性
+    static void update_property();
 
-    static void process_data();//处理数据
-
-    static void manage_objects();//派生对象
-
-    static void update_property();//更新属性
+private:
+    //派生对象
+    static void derive_object(const ObjectControlProperty &pro, DeriveRule *rule);
+//    static void destroy_object(FlyingObject * ptr);//销毁对象
 
 signals:
     void updated();//更新信号
@@ -120,6 +124,7 @@ public:
     explicit GamingWidget(MainWindow *_main_window = nullptr);
     ~GamingWidget() override;
 
+private:
     //初始化组件
     void init_components();
     //初始化界面
@@ -143,15 +148,23 @@ public:
     //计算属性
 //    void process_data_self();
 
+public:
+    //加载场景
+    void load_scene();
+    //初始化
+    void initialize();
+    //全部重置
+    void reset();
+
     //测试用函数
     void test();
     void exec();
 
 signals:
     void signal_push_info(const QString &string);//推送信息信号
-    void signal_send_status_bar_info(StatusBarInfo *);//更新鼠标位置信号
+    void signal_send_status_bar_info(StatusBarInfo *);//更新状态栏信息信号
 
-    void signal_process_data();//更新数据 信号
+    void signal_process_data();//更新数据 信号 (不使用)
     void signal_manage_objects();//管理对象(派生, 删除) 信号(不使用)
 
 public slots:
@@ -169,21 +182,6 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
 
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

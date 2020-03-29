@@ -1,4 +1,4 @@
-#include "Graphics.h"
+#include "universal.h"
 
 
 void GraphicsView::mouseMoveEvent(QMouseEvent *event)

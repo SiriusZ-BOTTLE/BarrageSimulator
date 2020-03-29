@@ -1,11 +1,4 @@
-#include "MainWindow.h"
-
-
-
-
-
-
-
+#include "universal.h"
 
 
 
@@ -85,7 +78,7 @@ void MainWindow::init_UI()
     menu_option->addAction(action_debug);
 
     //设置黑底白字
-    text_browser->setStyleSheet(".QTextBrowser{color:#EEEEEE;background-color:#000000;}");
+//    text_browser->setStyleSheet(".QTextBrowser {color:#EEEEEE;background-color:#000000;}");
     text_browser->append("hallo world!");
 
     //状态栏添加组件
@@ -93,6 +86,12 @@ void MainWindow::init_UI()
     status_bar->addWidget(label_num_updates);
     status_bar->addWidget(label_num_objects);
     status_bar->addWidget(label_time_cosumption);
+
+    this->setStyleSheet
+    (
+        "QWidget > QStatusBar > QLabel { font-family:consolas; font-style: bold }"
+        "QWidget > QTextBrowser { color:#EEEEEE; background-color:#000000; }"
+    );
 }
 
 void MainWindow::init_signal_slots()
@@ -131,19 +130,15 @@ void MainWindow::push_info(const QString &message)
 void MainWindow::update_status_info(StatusBarInfo *info)
 {
     //显示坐标
-    label_mouse_pos->setText(QString::asprintf("x:%4d, y:%4d",info->pos_mouse.x(),info->pos_mouse.y()));
+    label_mouse_pos->setText(QString::asprintf("(%4d, %4d)",info->pos_mouse.x(),info->pos_mouse.y()));
     //显示更新数
-    label_num_updates->setText(QString::asprintf("updates:%lld",info->num_updates));
+    label_num_updates->setText(QString::asprintf("updates:%-5lld",info->num_updates));
     //显示对象数
-    label_num_objects->setText(QString::asprintf("objects:%lld",info->num_objects));
+    label_num_objects->setText(QString::asprintf("objects:%-4lld",info->num_objects));
     //时间消耗
     label_time_cosumption->setText
-            (QString::asprintf("%lld/%lld/%.1f",info->time_consumption,info->time_consumption_average,1000000.0/info->time_consumption_average));
+            (QString::asprintf("%5lld/%5lld/%4.1f",info->time_consumption,info->time_consumption_average,1000000.0/info->time_consumption_average));
 }
-
-
-
-
 
 
 

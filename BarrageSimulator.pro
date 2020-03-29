@@ -30,7 +30,8 @@ HEADERS += \
     GamingWidget.h \
     Graphics.h \
     InnerData.h \
-    MainWindow.h
+    MainWindow.h \
+    universal.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

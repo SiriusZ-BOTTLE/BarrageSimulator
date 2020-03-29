@@ -32,7 +32,7 @@ using namespace Core;
     //元素
     extern Element* elements_inner_objects[EC2I(InnerObjects::End_Objects)];
     //内置对象
-    extern Core::Objects::HitObject objects_inner[EC2I(InnerObjects::End_Objects)];
+    extern Core::Objects::ManipulableObject objects_inner[EC2I(InnerObjects::End_Objects)];
     //各种fire规则
     extern DeriveRule rules_fire_inner[SeriesNumber][UpgradeLevel];
 
