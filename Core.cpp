@@ -278,17 +278,17 @@ void Core::Objects::FlyingObject::initialize()
 
 
 
-Core::Objects::ManipulableObject::ManipulableObject()
-{
-    type=ObjectType::ManipulableObject;//更改类型, 碰撞对象
-}
+//Core::Objects::ManipulableObject::ManipulableObject()
+//{
+//    type=ObjectType::ManipulableObject;//更改类型, 碰撞对象
+//}
 
-Core::Objects::ManipulableObject::ManipulableObject(const Core::Objects::ManipulableObject &ano)
-    :FlyingObject(ano)
-    ,property_gaming(ano.property_gaming)
-{
+//Core::Objects::ManipulableObject::ManipulableObject(const Core::Objects::ManipulableObject &ano)
+//    :FlyingObject(ano)
+//    ,property_gaming(ano.property_gaming)
+//{
 
-}
+//}
 
 
 Core::RunTimeData::RunTimeData()
@@ -388,14 +388,19 @@ Core::Definition::Decimal Core::ToolFunctionsKit::get_random_decimal_0_1()
 
 
 
-void Game::ResourcePackage::load(const QString &path)
+void Game::ResourcePackage::set_package_path()
+{
+
+}
+
+void Game::ResourcePackage::load()
 {
     QDir dir;
-    dir.setPath(path);
+    dir.setPath(this->path_pkg);
 
     //检查目录是否存在
     if(!dir.exists())
-        throw QString::asprintf("<ERROR> DIR %s not found",path.toStdString().c_str());
+        throw QString::asprintf("<ERROR> DIR %s not found",path_pkg.toStdString().c_str());
 
 }
 
@@ -433,7 +438,7 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
 
     ///---------------------------------------------------------------------------开始解析
-    ManipulableObject obj_new;
+    FlyingObject obj_new;
 
     QString name;///name(*)
     if(obj_json_root.contains("name"))
@@ -448,7 +453,7 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
     //容器中添加一个对象
     objects[name]=obj_new;
-    ManipulableObject & ref_obj_new = objects[name];
+    FlyingObject & ref_obj_new = objects[name];
 
 
     QPointF center{-1.0,-1.0};///center

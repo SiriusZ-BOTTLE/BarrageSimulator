@@ -140,7 +140,6 @@ namespace Core
         None,//空
     };
 
-
     class DeriveRule;
 
     ///内置碰撞频道
@@ -239,34 +238,6 @@ namespace Core
 
     };
     using OGP=ObjectGamingProperty;
-
-
-    ///AI控制属性
-    class ObjectAIProperty
-    {
-        bool flag_auto_spot{true};//是否自动索敌
-
-        bool flag_anticipation{false};//是否进行预判
-
-        Decimal frequency_dodge{1.0};//闪避频率
-        Integer cooldown_dodge{-1};//闪避冷却
-
-        BinaryVector<Decimal> rotate_idle;//随机旋转频率, 旋转程度
-        BinaryVector<Decimal> move_idle;//随机移动频率,移动程度
-
-        Decimal perception{300};//感知距离
-        Decimal frequency_attack{0.5};//攻击频率
-        Integer cooldown_attack{};//
-
-        Integer number_rest_attack{-1};//剩余攻击次数
-        Integer duration_attack{50};//单次攻击的持续时间
-        Decimal float_duration_attack{0.1};//持续时间波动
-
-        Decimal damage_rate{1.0};//伤害倍率
-        Decimal resist_rate{1.0};//抵抗倍率
-        Decimal penetrability_rate{1.0};//穿透倍率
-    };
-
 
     ///方向参照
     enum class DirectionReference
@@ -390,7 +361,7 @@ namespace Core
     };
 
     ///飞行对象
-    //可以是组, 可以是单个元素, 支持嵌套, 可以碰撞, 可以派生, 是管理元素并存储数据的对象
+    //可以是组, 可以是单个元素, 支持嵌套, 可以碰撞
     class FlyingObject
     {
         friend class ::ObjectsControl;//友元类
@@ -398,7 +369,6 @@ namespace Core
         static Integer seq;
     public:
         ObjectControlProperty property{};//基本属性
-        ObjectGamingProperty property_gaming{};//gaming状态属性
 
     protected:
         Integer id{0};//id号, 唯一全局标识符(执行构造函数时自动设置, 无需手动设置)
@@ -435,6 +405,20 @@ namespace Core
         void initialize();
     };
 
+    ///可操纵对象: 公有继承 飞行对象
+    class ManipulableObject: public FlyingObject
+    {
+        using FlyingObject::FlyingObject;//使用基类的全部构造函数
+        friend class ::ObjectsControl;//友元类
+    public:
+        ObjectGamingProperty property_gaming{};//gaming状态属性
+    public:
+        //构造函数
+        ManipulableObject();
+        //复制构造函数
+        ManipulableObject(const ManipulableObject&ano);
+    };
+
 
     }
 
@@ -448,31 +432,27 @@ namespace Core
         {
         private:
             //包路径
-            QString path_pkg{""};
-            //对象文件映射<对象名称, 资源路径>
-            std::map<QString, QString> map_object_files{};
-            //派生规则文件映射<, 资源路径>
-            std::map<Integer, QString> map_rule_files{};
+            QString path_pkg{"Undefined"};
+            //资源映射<资源名称, 资源路径>
+            std::map<QString, QString> map_file;
 
             //包内的全部图片资源
             std::vector<QPixmap> pixmaps{};
             //包内元素
             std::vector<Element> elements{};
-            //对象(每一个对象在包内都有唯一的名称, 场景引用资源时也使用名称进行访问)
-            std::map<QString, FlyingObject> objects{};
-            //派生规则(每一条规则在包内都有唯一的ID号, 供对象使用)
+            //对象
+//            std::vector<ManipulableObject> objects{};
+            std::map<QString, ManipulableObject> objects{};
+            //派生规则
             std::map<Integer, DeriveRule>rules_derive{};
 
         public:
-            //构造函数
+            //构造函数(私有, 无法手动构造)
             ResourcePackage();
 
         public:
-            //设置路径
-            void set_package_path();
             //加载目标目录下的文件
-            void load();
-
+            void load(const QString &path);
 
         private:
             //解析对象json文件
@@ -483,19 +463,15 @@ namespace Core
         };
 
 
-        ///场景(level)
+
+        ///场景(待完成)
         class Scene
         {
         private:
-            QString name{"Undefined"};//场景名称
-            QString description{"Undefined"};//描述
-            QString name_resource{""};//使用的资源名称
-//            QString
-
             QPoint size{500,500};//场景总大小(单位: 像素)
-            QPoint pos{0,0};//初始显示位置(单位: 像素, 指定初始显示视图的左上角对应的场景坐标)
+            QPoint pos{};//场景
 
-            QPixmap preview{};//场景预览
+
 
         };
 
@@ -507,8 +483,8 @@ namespace Core
     class RunTimeData
     {
     public:
-        FlyingObject *p1{nullptr};//player1
-        FlyingObject *p2{nullptr};//player2
+        ManipulableObject *p1{nullptr};//player1
+        ManipulableObject *p2{nullptr};//player2
 //        ManipulableObject *p3{nullptr};//player3
 //        ManipulableObject *p4{nullptr};//player3
 

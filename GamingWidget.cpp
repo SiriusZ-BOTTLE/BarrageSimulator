@@ -252,14 +252,13 @@ void ObjectsControl::process_data()
                 flag_continue=true;//没开标记跳过
 
 
-            if(p_crt->type==ObjectType::ManipulableObject&&p_another->type==ObjectType::ManipulableObject)
             {
                 //都是碰撞对象
                 ///处理game数据
 
                 //获取game数据引用
-                auto &pro_g_crt = static_cast<ManipulableObject*>(p_crt)->property_gaming;
-                auto &pro_g_ano = static_cast<ManipulableObject*>(p_another)->property_gaming;
+                auto &pro_g_crt = p_crt->property_gaming;
+                auto &pro_g_ano = p_another->property_gaming;
 
                 if((pro_g_crt.team==pro_g_ano.team&&(pro_g_crt.flag_team_kill||pro_g_ano.flag_team_kill))||pro_g_crt.team!=pro_g_ano.team)
                     //同队伍但开启了友伤 或 不同队伍
@@ -446,7 +445,7 @@ void ObjectsControl::manage_objects()
         if(p_crt->type==ObjectType::ManipulableObject)
         {
             //检查耐久
-            if(static_cast<ManipulableObject*>(p_crt)->property_gaming.endurance.first<0)
+            if((p_crt)->property_gaming.endurance.first<0)
                 flag_destroy=true;
         }
 
@@ -510,21 +509,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
             continue;
         try
         {
-            switch (unit.p->type)
-            {
-            case ObjectType::FlyingObject:
-            {
-                obj_new = new FlyingObject(*unit.p); //申请新对象
-                break;
-            }
-            case ObjectType::ManipulableObject:
-            {
-                obj_new = new ManipulableObject(*static_cast<ManipulableObject *>(unit.p)); //申请新对象
-                break;
-            }
-            case ObjectType::End_ObjectType:
-                break;
-            }
+            obj_new = new FlyingObject(*(unit.p)); //申请新对象
         }
         catch (std::exception &e)
         {
@@ -665,6 +650,7 @@ void GameWidget::init_components()
     layout_panel_title=new QGridLayout();
     layout_panel_start=new QGridLayout();
 
+
     button_start=new Button("START");
     button_load=new Button("LOAD");
     button_options=new Button("OPTIONS");
@@ -677,6 +663,7 @@ void GameWidget::init_components()
     label_info_esc_menu = new QLabel();
     label_title=new QLabel();
     label_bottom_info_title=new QLabel();
+    label_start_page_top=new QLabel();
 }
 
 void GameWidget::init_UI()
@@ -745,6 +732,11 @@ void GameWidget::init_UI()
     widget_start->setLayout(layout_start);
     layout_start->setContentsMargins(0,0,0,0);
 
+    label_start_page_top->setText("Scenes");
+    label_start_page_top->setContentsMargins(5,5,5,5);
+    label_start_page_top->setObjectName("title");
+
+    layout_start->addWidget(label_start_page_top,0,0,Qt::AlignLeft);
     layout_start->setRowStretch(1,1);
     layout_start->addWidget(panel_start,2,0);
     layout_start->setRowStretch(3,1);
@@ -752,8 +744,11 @@ void GameWidget::init_UI()
     panel_start->setLayout(layout_panel_start);
     panel_start->setObjectName("panel");
 
-    layout_panel_start->addWidget(list_widget_start,0,0,Qt::AlignCenter);
-    layout_panel_start->addWidget(button_back_start,1,0,Qt::AlignCenter);
+    layout_panel_start->addWidget(list_widget_start,0,1,Qt::AlignCenter);
+    layout_panel_start->addWidget(button_back_start,1,1,Qt::AlignCenter);
+    layout_panel_start->setColumnStretch(0,1);
+    layout_panel_start->setColumnStretch(1,1);
+    layout_panel_start->setColumnStretch(2,1);
 
     list_widget_start->setFixedSize(402,500);
 
@@ -791,6 +786,7 @@ void GameWidget::init_UI()
     layout_widget_menu->addWidget(button_exit_pause_menu, 3, 0, Qt::AlignLeft);
 
     label_info_esc_menu->setText("Barrage Simulator");
+    label_info_esc_menu->setObjectName("title");
 
     widget_menu->setParent(this);
     widget_menu->setVisible(false); //不可见
@@ -800,7 +796,7 @@ void GameWidget::init_UI()
     ///总体样式
     this->setStyleSheet(
         //全部
-        "QWidget { background-color:rgba(0,0,0,0.05); color: #ffffff; font-size: 20px; font-family: consolas; }"
+        "QWidget { background-color:rgba(0,0,0,0.01); color: #ffffff; font-size: 20px; font-family: consolas; }"
         //暂停菜单
         "QWidget#widget_menu { background-color: rgba(00,00,00,0.6); }"
         //面板
@@ -813,7 +809,7 @@ void GameWidget::init_UI()
         "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
         "QWidget#panel > QPushButton { width: 400px; height:50px; }"
         //label背景色
-        "QWidget QLabel{ background-color: rgba(0,0,0,0.0); color: #ffffff; }"
+        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; }"
     );
 
     //各种组件的尺寸初始设置
@@ -1059,12 +1055,12 @@ void GameWidget::exec()
 
 void GameWidget::test()
 {
-    data_runtime.p1 = new ManipulableObject(*dynamic_cast<ManipulableObject *>(&objects_inner[InnerObjects::Block_zero_blue]));
+    data_runtime.p1 = new FlyingObject(objects_inner[InnerObjects::Block_zero_blue]);
     data_runtime.p1->property.coordinate = {100, 100};
     data_runtime.p1->add_to_scene(scene_main);    //添加到场景
     data_runtime.list_objects << data_runtime.p1; //添加到对象列表中
 
-    auto p = new ManipulableObject(*dynamic_cast<ManipulableObject *>(&objects_inner[InnerObjects::Block_zero_red]));
+    auto p = new FlyingObject(objects_inner[InnerObjects::Block_zero_red]);
     p->property.coordinate={500,200};
     p->add_to_scene(scene_main);    //添加到场景
     data_runtime.list_objects << p; //添加到对象列表中

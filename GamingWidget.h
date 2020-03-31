@@ -106,6 +106,7 @@ public:
     QLabel * label_info_esc_menu{nullptr};
     QLabel * label_title{nullptr};//标题
     QLabel * label_bottom_info_title{nullptr};//标题页底部信息
+    QLabel * label_start_page_top{nullptr};//
 
     GraphicsScene * scene_title{nullptr};//标题页背景场景
     GraphicsView * view_title{nullptr};//标题页背景视图

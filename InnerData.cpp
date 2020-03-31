@@ -14,7 +14,7 @@ QString paths_pixmap[EC2I(InnerObjects::End_Objects)]=
 
 QPixmap* pixmaps_inner_objects[EC2I(IOS::End_Objects)];
 Element* elements_inner_objects[EC2I(InnerObjects::End_Objects)];
-Objects::ManipulableObject objects_inner[EC2I(IOS::End_Objects)];
+Objects::FlyingObject objects_inner[EC2I(IOS::End_Objects)];
 DeriveRule rules_fire_inner[SeriesNumber][UpgradeLevel];
 
 void init_inner_data()
