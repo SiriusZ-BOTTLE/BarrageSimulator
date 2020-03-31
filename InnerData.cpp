@@ -6,11 +6,9 @@ namespace InnerData
 
 QString paths_pixmap[EC2I(InnerObjects::End_Objects)]=
 {
-//    ":/materials/charactors/RESOURCES/block_zero.png",
-//    ":/materials/bullets/RESOURCES/bullet_type0_blue.png"
-    "./data/pixmaps/block_zero_blue.png",
-    "./data/pixmaps/bullet_type0_blue.png",
-    "./data/pixmaps/block_zero_red.png"
+    "./data/images/block_zero_blue.png",
+    "./data/images/bullet_type0_blue.png",
+    "./data/images/block_zero_red.png"
 };
 
 
@@ -52,7 +50,7 @@ void init_inner_data()
     ///初始化fire规则
     rules_fire_inner[0][0]=
     {
-        10,//十个数据更新周期可以生成执行一次生成操作
+        15,//十个数据更新周期可以生成执行一次生成操作
         {
             {
                 objects_inner+IOS::Bullet_type0_blue,
@@ -65,28 +63,17 @@ void init_inner_data()
                 0,//初始角度
                 0.02//角度浮动
             },
-            {
-                objects_inner+IOS::Bullet_type0_blue,
-                DR::RelativeToParentRotation,
-                false,//不继承父对象速度
-                true,//相对位置
-                {0,-50},//初始位置
-                {0,-1},//初始速度
-                {0,-1},//初始加速度
-                0,//初始角度
-                0.02//角度浮动
-            },
-            {
-                objects_inner+IOS::Bullet_type0_blue,
-                DR::RelativeToParentRotation,
-                false,//不继承父对象速度
-                true,//相对位置
-                {0,-50},//初始位置
-                {0,-1},//初始速度
-                {0,-1},//初始加速度
-                0,//初始角度
-                0.02//角度浮动
-            }
+//            {
+//                objects_inner+IOS::Bullet_type0_blue,
+//                DR::RelativeToParentRotation,
+//                false,//不继承父对象速度
+//                true,//相对位置
+//                {0,-50},//初始位置
+//                {0,-1},//初始速度
+//                {0,-1},//初始加速度
+//                0,//初始角度
+//                0.02//角度浮动
+//            }
         }
 
     };
@@ -118,12 +105,12 @@ void init_block_zero_blue()
     tmp.property.acceleration_max=0.4;//最大加速度
     tmp.property.mode_movement=MovementMode::Stop;//自动停止(根据按键设置)
     tmp.property.mode_rotation=RotationMode::TowardsMouse;//跟随鼠标
-    tmp.property.angular_initial_target.first=90;//正面偏移量
+    tmp.property.offset_front=90;//正面偏移量
     tmp.property.angular_speed_max.second=10;//最大角速度
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
     tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
-//    tmp.property_gaming.team=0;//队伍
+    tmp.property_gaming.team=InnerTeam::PlayerTeam;//队伍
     tmp.property_gaming.damage=5;//碰撞伤害
     tmp.property_gaming.resist=10;//抵抗
     tmp.property_gaming.endurance={100,100};//耐久
@@ -147,7 +134,7 @@ void init_bullet_type0_blue()
     tmp.property.flag_channel_collision=false;//同频道碰撞
     tmp.property.number_rest_collision=2;//碰撞次数
     tmp.property.mass=3;//质量
-    tmp.property.lifetime=500;
+    tmp.property.lifetime=200;
     tmp.property.flag_boundary_restriction=false;//边界限制关闭
     tmp.property.flag_delete_outside_scene=false;
     tmp.property.velocity_max=15;//最大速率限制
@@ -155,15 +142,15 @@ void init_bullet_type0_blue()
     tmp.property.acceleration_max=0;//最大加速度
     tmp.property.mode_movement=MovementMode::Unlimited;//无限制(根据按键设置)
     tmp.property.mode_rotation=RotationMode::FollowSpeed;//跟随速度方向
-    tmp.property.angular_initial_target.first=-90;//正面角度偏移量
+    tmp.property.offset_front=-90;//正面角度偏移量
 
 //    tmp.property_gaming.index_bullet_series=0;//0系列
 //    tmp.property_gaming.index_bullet_level=0;//等级0
 
-//    tmp.property_gaming.team=1;//队伍
+    tmp.property_gaming.team=InnerTeam::PlayerTeam;//队伍
     tmp.property_gaming.damage=10;//碰撞伤害
-    tmp.property_gaming.resist=0;//抵抗
-    tmp.property_gaming.endurance={0,0};//耐久
+    tmp.property_gaming.resist=100;//抵抗
+    tmp.property_gaming.endurance={100,100};//耐久
     tmp.property_gaming.penetrability=5;//穿透
     tmp.property_gaming.flag_team_kill=false;//友伤
 
@@ -189,12 +176,12 @@ void init_block_zero_red()
     tmp.property.acceleration_max=0.4;//最大加速度
     tmp.property.mode_movement=MovementMode::Stop;//自动停止(根据按键设置)
     tmp.property.mode_rotation=RotationMode::Stop;//跟随鼠标
-    tmp.property.angular_initial_target.first=90;//正面偏移量
+    tmp.property.offset_front=90;//正面偏移量
     tmp.property.angular_speed_max.second=10;//最大角速度
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
     tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
-//    tmp.property_gaming.team=1;//队伍
+    tmp.property_gaming.team=InnerTeam::ComputerTeam;//队伍
     tmp.property_gaming.damage=5;//碰撞伤害
     tmp.property_gaming.resist=10;//抵抗
     tmp.property_gaming.endurance={100,100};//耐久

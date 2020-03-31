@@ -15,7 +15,7 @@
 
 using namespace Core::Objects;
 
-class GamingWidget;//前导声明
+class GameWidget;//前导声明
 class StatusBarInfo;
 
 class MainWindow : public QMainWindow
@@ -56,7 +56,7 @@ public:
     QString text{"Hallo World!"};//文本
 //    QTextEdit * text_edit{nullptr};
 
-    GamingWidget * widget_gaming{nullptr};//游戏组件
+    GameWidget * widget_gaming{nullptr};//游戏组件
 
 public:
     MainWindow(QWidget *parent = nullptr);

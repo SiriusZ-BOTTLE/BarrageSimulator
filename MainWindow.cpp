@@ -33,7 +33,8 @@ void MainWindow::init_components()
     menu_other=new QMenu("Other(&T)");
 
     //创建action
-//    action_start
+    action_start=new QAction("Start");
+    action_quit=new QAction("Quit");
     action_debug=new QAction("TEST");
 
 
@@ -51,7 +52,7 @@ void MainWindow::init_components()
 
     text_browser=new QTextBrowser();
 
-    widget_gaming=new GamingWidget(this);
+    widget_gaming=new GameWidget(this);
 //    widget_gaming->show();
 
 }
@@ -75,10 +76,12 @@ void MainWindow::init_UI()
     menu_bar->addMenu(menu_other);
 
     //菜单添加项
+    menu_control->addAction(action_start);
+    menu_control->addSeparator();
+    menu_control->addAction(action_quit);
+
     menu_option->addAction(action_debug);
 
-    //设置黑底白字
-//    text_browser->setStyleSheet(".QTextBrowser {color:#EEEEEE;background-color:#000000;}");
     text_browser->append("hallo world!");
 
     //状态栏添加组件
@@ -97,12 +100,12 @@ void MainWindow::init_UI()
 void MainWindow::init_signal_slots()
 {
     //action
-    connect(action_debug,&QAction::triggered,this->widget_gaming,&GamingWidget::test);
-    connect(action_debug,&QAction::triggered,this->widget_gaming,&GamingWidget::show);
+    connect(action_debug,&QAction::triggered,this->widget_gaming,&GameWidget::test);
+    connect(action_start,&QAction::triggered,this->widget_gaming,&GameWidget::start);
     //widgit_gaming 消息推送
-    connect(widget_gaming,&GamingWidget::signal_push_info,this,&MainWindow::push_info);
+    connect(widget_gaming,&GameWidget::signal_push_info,this,&MainWindow::push_info);
     //鼠标位置更新
-    connect(widget_gaming,&GamingWidget::signal_send_status_bar_info,this,&MainWindow::update_status_info);
+    connect(widget_gaming,&GameWidget::signal_send_status_bar_info,this,&MainWindow::update_status_info);
 
 }
 

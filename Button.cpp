@@ -22,6 +22,6 @@ Button::Button(QWidget *parent)
 
 void Button::format()
 {
-    this->setFixedSize(Settings::width_button,Settings::height_button);
+//    this->setFixedSize(Settings::width_button,Settings::height_button);
     this->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
 }

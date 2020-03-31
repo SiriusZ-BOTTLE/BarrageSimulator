@@ -13,28 +13,29 @@
         "flag_collision":true,
         "flag_channel_collision":true,
         "number_rest_collision":-1,
-        "rule_derive":null,
-        "rule_on_collision":null,
-        "rule_on_destyoy":null,
-        "mass":100,
-        "inertia_rotational":10,
+        "rule":-1,
+        "rule_on_collision":-1,
+        "rule_on_destroy":-1,
+        "mass":100.0,
+        "inertia_rotational":10.0,
         "elasticity":0.9,
         "mode_movement":"Stop",
         "velocity_max":15,
         "acceleration_max":0.4,
         "attenuation_velocity":0.4,
+        "mode_rotation":"TowardsMouse",
         "coefficient_friction":1.0,
         "angular_initial_target":[0.0,0.0],
         "angular_speed_max":[0.0,10.0],
-        "angular_acc_max":[0.0,0.2],
-        "rotation":0.0
+        "angular_acc_max":[0.0,0.2]
     },
-    "property_gaming":
+    "property_game":
     {
+        "flag_team_kill":false,
+        "team":1,
+        "endurance":[100,100],
         "damage":5,
         "resist":10,
-        "endurance":[100,100],
-        "penetrability":0,
-        "flag_team_kill":false
+        "penetrability":0
     }
 }

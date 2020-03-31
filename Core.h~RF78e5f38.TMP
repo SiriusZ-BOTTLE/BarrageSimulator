@@ -17,7 +17,6 @@
 #include <QBitmap>
 #include <QStackedWidget>
 #include <QGraphicsEffect>
-#include <QListWidget>
 
 #include <QMetaType>
 #include <QLabel>
@@ -538,11 +537,11 @@ using namespace Core;
 
     extern int size_font;//字体大小
 
-    extern int radius_blur;//模糊半径
+    extern int radius_blur=20;//模糊半径
     extern int interval_title;//标题页背景刷新间隔(单位ms)
     extern int period_change_title_bg;//更换标题背景图片的周期
     extern int period_change_speed;//更换移动速度的周期
-    extern Decimal speed_bg_moving;//抽象最大移动速度
+    extern int speed_bg_moving;//抽象最大移动速度
 
     extern Definition::Decimal distance_mutex;//互斥距离
 
