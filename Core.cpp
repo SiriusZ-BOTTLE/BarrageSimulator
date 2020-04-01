@@ -65,6 +65,8 @@ namespace Settings
     QString path_title_image="./data/images/title.png";
 
     QString path_dir_title_bg="./data/images/images_background_title/";
+    //场景文件路径
+    QString path_scenes="./data/levels/";
 
 
 }
@@ -907,6 +909,19 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
 
 
+
+
+
+
+
+
+
+
+
+void Game::Scene::set_file_path(const QString &path)
+{
+    this->path_file=path;
+}
 
 
 

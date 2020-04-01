@@ -128,8 +128,10 @@ public:
     Button * button_options{nullptr};//选项
     Button * button_exit{nullptr};//退出
 
+    //开始页按钮
+    Button * button_refresh_start{nullptr};//开始页刷新按钮
     Button * button_back_start{nullptr};//开始页返回按钮
-
+    Button * button_play_start{nullptr};//开始页play按钮
 
     ///暂停菜单按钮
     Button * button_resume_pause_menu{nullptr};
@@ -196,6 +198,8 @@ private:
 public:
     //加载场景
     void load_scene();
+    //加载列表
+    void load_scene_list();
     //初始化
     void initialize();
     //全部重置

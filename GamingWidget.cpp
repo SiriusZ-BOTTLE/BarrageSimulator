@@ -655,10 +655,12 @@ void GameWidget::init_components()
     button_load=new Button("LOAD");
     button_options=new Button("OPTIONS");
     button_exit=new Button("EXIT");
+    button_refresh_start=new Button("REFRESH");
 
     button_resume_pause_menu = new Button("RESUME");
     button_exit_pause_menu = new Button("EXIT");
     button_back_start=new Button("BACK");
+    button_play_start=new Button("PLAY!");
 
     label_info_esc_menu = new QLabel();
     label_title=new QLabel();
@@ -668,6 +670,29 @@ void GameWidget::init_components()
 
 void GameWidget::init_UI()
 {
+
+    ///总体样式
+    this->setStyleSheet(
+        //全部
+        "QWidget { background-color:rgba(0,0,0,0.01); color: #ffffff; font-size: 20px; font-family: consolas; }"
+        //暂停菜单
+        "QWidget#widget_menu { background-color: rgba(00,00,00,0.6); }"
+        //面板
+        "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
+        //按钮
+        "QPushButton { background-color: rgba(0,0,0,1.0); color: #ffffff; border: 2px solid #00ff00; width: 200px; height:50px; }"
+        "QWidget:disabled { background-color: rgba(0,0,0,0.0); color: #999999; border: 2px solid #000000; }"
+        //按钮hover
+        "QPushButton::hover{ background-color: rgba(200,200,200,1.0); border: 2px solid #000000; }"
+        //面板下
+        "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
+        "QWidget#panel > QPushButton { width: 400px; }"
+        "QWidget#panel > QPushButton#refresh { width:200px; border: 2px solid #000000; }"
+        //label背景色
+        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; }"
+    );
+
+
 
     ///主窗口
     this->setWindowTitle("BarrageSimulator - Particles");
@@ -744,10 +769,16 @@ void GameWidget::init_UI()
     panel_start->setLayout(layout_panel_start);
     panel_start->setObjectName("panel");
 
-    layout_panel_start->addWidget(list_widget_start,0,1,Qt::AlignCenter);
-    layout_panel_start->addWidget(button_back_start,1,1,Qt::AlignCenter);
+    button_refresh_start->setObjectName("refresh");
+    button_play_start->setEnabled(false);//默认不可用
+
+    layout_panel_start->addWidget(list_widget_start,0,1,Qt::AlignCenter);//列表组件
+    layout_panel_start->addWidget(button_refresh_start,0,2,Qt::AlignLeft|Qt::AlignTop);//刷新按钮
+    layout_panel_start->addWidget(button_play_start,1,2,Qt::AlignLeft);//刷新按钮
+    layout_panel_start->addWidget(button_back_start,1,1,Qt::AlignCenter);//返回按钮
+
     layout_panel_start->setColumnStretch(0,1);
-    layout_panel_start->setColumnStretch(1,1);
+    layout_panel_start->setColumnStretch(1,0);
     layout_panel_start->setColumnStretch(2,1);
 
     list_widget_start->setFixedSize(402,500);
@@ -793,24 +824,9 @@ void GameWidget::init_UI()
     widget_menu->raise();           //置于顶层
     widget_menu->setObjectName("widget_menu");
 
-    ///总体样式
-    this->setStyleSheet(
-        //全部
-        "QWidget { background-color:rgba(0,0,0,0.01); color: #ffffff; font-size: 20px; font-family: consolas; }"
-        //暂停菜单
-        "QWidget#widget_menu { background-color: rgba(00,00,00,0.6); }"
-        //面板
-        "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
-        //按钮
-        "QPushButton{ background-color: rgba(0,0,0,1.0); color: #ffffff; border: 2px solid #00ff00; width: 200px; height:50px; }"
-        //按钮hover
-        "QPushButton::hover{ background-color: rgba(200,200,200,1.0); border: 2px solid #000000; }"
-        //面板下
-        "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
-        "QWidget#panel > QPushButton { width: 400px; height:50px; }"
-        //label背景色
-        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; }"
-    );
+
+
+
 
     //各种组件的尺寸初始设置
     this->resize(Settings::width_gaming,Settings::height_gaming);
@@ -1023,6 +1039,19 @@ void GameWidget::clear()
     for(auto p_object:data_runtime.list_objects)
         delete p_object;
 }
+
+void GameWidget::load_scene_list()
+{
+    QDir dir(Settings::path_scenes);
+    if(!dir.exists())
+    {
+        list_widget_start->clear();//清空
+        return;
+    }
+    QStringList filter{"*.json"};
+    QStringList path_files=dir.entryList(filter,QDir::Readable,QDir::Name);
+}
+
 
 void GameWidget::initialize()
 {

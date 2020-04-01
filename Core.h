@@ -244,8 +244,8 @@ namespace Core
     ///AI控制属性
     class ObjectAIProperty
     {
+    public:
         bool flag_auto_spot{true};//是否自动索敌
-
         bool flag_anticipation{false};//是否进行预判
 
         Decimal frequency_dodge{1.0};//闪避频率
@@ -256,7 +256,7 @@ namespace Core
 
         Decimal perception{300};//感知距离
         Decimal frequency_attack{0.5};//攻击频率
-        Integer cooldown_attack{};//
+        Integer cooldown_attack{100};//攻击冷却
 
         Integer number_rest_attack{-1};//剩余攻击次数
         Integer duration_attack{50};//单次攻击的持续时间
@@ -483,20 +483,43 @@ namespace Core
         };
 
 
-        ///场景(level)
+        ///场景生成规则
+        class SceneGenerateRule
+        {
+        public:
+            bool flag_in_viewport{false};//是否允许生成在视口内
+            Integer requirement_time{0};//时间需求(单位: 更新数)
+            Integer requirement_kills{0};//击杀数需求
+
+            Integer number{1};//生成数量
+            QString name_object{""};//要生成的对象的名称
+
+            Decimal rotation{0.0};//初始旋转角度, 小于0则随机角度
+            QPointF pos{-1,-1};//生成位置, 分量小于0则随机放置
+        };
+
+        ///场景(level)-对应一个json文件
         class Scene
         {
         private:
             QString name{"Undefined"};//场景名称
+            QString path_file{""};//json文件路径
             QString description{"Undefined"};//描述
             QString name_resource{""};//使用的资源名称
 //            QString
 
-            QPoint size{500,500};//场景总大小(单位: 像素)
+            QPoint size{1000,1000};//场景总大小(单位: 像素)
             QPoint pos{0,0};//初始显示位置(单位: 像素, 指定初始显示视图的左上角对应的场景坐标)
 
             QPixmap preview{};//场景预览
 
+            Integer index_crt_rule{0};//当前生成规则索引
+
+            QVector<SceneGenerateRule> rules;//生成规则(注意生成时只能按照顺序)
+
+        public:
+            void set_file_path(const QString &path);
+            void load();//加载文件
         };
 
 
@@ -520,6 +543,8 @@ namespace Core
 
         QReadWriteLock lock{};//读写锁
 
+        Integer index_crt_scene{-1};//当前场景
+        QVector<Game::Scene> scenes;//场景(从场景json文件中读取)
 
         //按键状态
         bool status_keys[End_Key]{false};
@@ -582,6 +607,8 @@ using namespace Core;
     extern QString path_title_image;
     //背景图目录
     extern QString path_dir_title_bg;
+    //场景文件路径
+    extern QString path_scenes;
 
 
 }
