@@ -102,8 +102,6 @@ void MainWindow::init_signal_slots()
     //action
     connect(action_debug,&QAction::triggered,this->widget_gaming,&GameWidget::test);
     connect(action_start,&QAction::triggered,this->widget_gaming,&GameWidget::start);
-    //widgit_gaming 消息推送
-    connect(widget_gaming,&GameWidget::signal_push_info,this,&MainWindow::push_info);
     //鼠标位置更新
     connect(widget_gaming,&GameWidget::signal_send_status_bar_info,this,&MainWindow::update_status_info);
 
@@ -133,7 +131,7 @@ void MainWindow::push_info(const QString &message)
 void MainWindow::update_status_info(StatusBarInfo *info)
 {
     //显示坐标
-    label_mouse_pos->setText(QString::asprintf("(%4d, %4d)",info->pos_mouse.x(),info->pos_mouse.y()));
+    label_mouse_pos->setText(QString::asprintf("(%4.0f, %4.0f)",info->pos_mouse.x(),info->pos_mouse.y()));
     //显示更新数
     label_num_updates->setText(QString::asprintf("updates:%-5lld",info->num_updates));
     //显示对象数

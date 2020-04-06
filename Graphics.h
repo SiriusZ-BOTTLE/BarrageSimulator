@@ -6,14 +6,12 @@
 #include <QMouseEvent>
 #include <QDebug>
 
-#include "Core.h"
-
 
 class GraphicsView : public QGraphicsView
 {
     using QGraphicsView::QGraphicsView;
 public:
-    QPoint pos_mouse{};
+    QPointF pos_mouse{};
 
     //鼠标移动事件
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -28,6 +26,9 @@ public:
 class GraphicsScene : public QGraphicsScene
 {
     using QGraphicsScene::QGraphicsScene;
+public:
+    QBrush brush_internal{};//内部笔刷
+    QBrush brush_external{};//外部笔刷
 
 public:
     //绘制背景

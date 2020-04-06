@@ -18,6 +18,7 @@
 #include <QStackedWidget>
 #include <QGraphicsEffect>
 #include <QListWidget>
+#include <QTextBrowser>
 
 #include <QMetaType>
 #include <QLabel>
@@ -45,6 +46,8 @@
 #include <cmath>
 #include <chrono>
 #include <iostream>
+
+#include "Graphics.h"
 
 #if defined(_WIN32)
 #if defined(_MSC_VER)
@@ -121,15 +124,16 @@ namespace Core
     ///位移模式
     enum class MovementMode
     {
+        None=-1,//空
         Stop,//自动停止(立即消除加速度大小, 自动速度衰减)
         TowardsTarget,//朝向目标(自动位移至目标位置)(暂未实现)
         Unlimited,//无限制(使用加速度, 速度等物理量计算位置)
-        None,//空
     };
 
     ///旋转模式
     enum class RotationMode
     {
+        None=-1,//空
         Fixed,//固定方向(不能旋转)
         Stop,//自动停止(立即消除角加速度大小, 自动角速度衰减)
         FollowSpeed,//跟随速度(始终保持与速度方向一致)
@@ -137,9 +141,7 @@ namespace Core
         TowardsMouse,//指向鼠标(自动朝向鼠标方向)
         TowardsTarget,//指向目标(自动指向目标坐标)
         Unlimited,//无限制(使用角加速度, 角速度等物理量计算旋转角度)
-        None,//空
     };
-
 
     class DeriveRule;
 
@@ -166,23 +168,28 @@ namespace Core
     public:
         Integer lifetime{-1};//生命周期(小于0时持续存在, 等于0时生命结束)
         Integer channel_collision{0};//碰撞频道(处于不同频道的对象会产生碰撞)
-//        Integer subchannel_collision{0};//子碰撞频道(碰撞频道和子碰撞频道同时相同时不会发生碰撞, 否则会发生碰撞)
         bool flag_end{false};//生命周期结束标记(为false时会被释放)
         bool flag_delete_outside_scene{true};//是否在场景外应该被释放的标记
         bool flag_boundary_restriction{false};//边界限制
         bool flag_collision{true};//是否考虑碰撞的标记(默认考虑碰撞, 为false时不会受到任何碰撞)
         bool flag_channel_collision{false};//同频道是否发生碰撞的标记(默认处于同一频道不会发生碰撞)
         bool flag_drive{false};//是否处于可以派生新对象的状态
+        bool flag_mutex{true};//是否产生互斥(为true时根据全局的互斥变量计算互斥)
         Integer cooldown_highlight{0};//高亮冷却, 到0的时候取消高亮效果
         Integer cooldown_drive{0};//派生冷却, 到0的时候才能继续派生
         Integer number_rest_collision{1};//剩余碰撞次数(碰撞时数量-1, 到0时结束生命)
-        DeriveRule * rule{nullptr};//生成规则
-        DeriveRule * rule_on_collision{nullptr};//碰撞时的生成规则
-        DeriveRule * rule_on_destroy{nullptr};//被析构时的生成规则
+//        DeriveRule * rule{nullptr};//生成规则
+//        DeriveRule * rule_on_collision{nullptr};//碰撞时的生成规则
+//        DeriveRule * rule_on_destroy{nullptr};//被析构时的生成规则
+
+        Integer rule{-1};//生成规则
+        Integer rule_on_collision{-1};//碰撞时的生成规则
+        Integer rule_on_destroy{-1};//被析构时的生成规则
 
         Integer count_drive{0};//派生次数
 
         Decimal mass{1};//质量(用于计算碰撞后速度)
+        Decimal force_mutex{20};//互斥力(用于计算互斥后速度, 除以目标质量后得到加速度, 直接将加速度作用于目标素的)
         Decimal inertia_rotational{1};//转动惯量(用于计算碰撞后的旋转速度)
         Decimal elasticity{1.0};//弹性(用于计算碰撞后轴向的动能损失, 弹性为1则不损失动能)
         BinaryVector<Decimal> coordinate{0,0};//坐标(横坐标, 纵坐标)
@@ -232,31 +239,34 @@ namespace Core
     public:
         bool flag_team_kill{false};//同队伍伤害
         Integer team{0};//队伍, 同一队伍间默认不会造成伤害
+        Integer score{0};//得分, 析构后总得分加上该值(为负数则扣分)
         BinaryVector<Decimal> endurance{0,0};//耐久/最大耐久
         Decimal damage{0};//伤害
-        Decimal resist{1};//抵抗(抵抗不要设为0)
+        Decimal resist{1};//抵抗(抵抗不能设为0, 否则出现非数(nan))
         Decimal penetrability{0};//穿透
 
     };
     using OGP=ObjectGamingProperty;
 
-
-    ///AI控制属性
-    class ObjectAIProperty
+    ///对象行为属性(用于AI控制)
+    class ObjectActionProperty//聚合类
     {
+        //行文判定之后无论成功或失败都需要等待冷却
     public:
-        bool flag_auto_spot{true};//是否自动索敌
+        bool flag_player_manip{false};//玩家操纵标记,是玩家操纵单位下面所有的行为都不会生效
+        bool flag_auto_target{true};//是否自动瞄准敌方目标
         bool flag_anticipation{false};//是否进行预判
 
-        Decimal frequency_dodge{1.0};//闪避频率
-        Integer cooldown_dodge{-1};//闪避冷却
+        Decimal frequency_dodge{0.5};//闪避频率(无论是否判定成功都需要冷却)
+        BinaryVector<Integer> cooldown_dodge{0,-1};//闪避冷却, 闪避周期(为负数表示没有冷却)
 
-        BinaryVector<Decimal> rotate_idle;//随机旋转频率, 旋转程度
-        BinaryVector<Decimal> move_idle;//随机移动频率,移动程度
+        BinaryVector<Decimal> rotate_idle{0.5,60};//随机旋转频率, 旋转程度(闲置)
+        BinaryVector<Decimal> move_idle{0.5,100};//随机移动频率, 移动程度(闲置)
+        BinaryVector<Integer> cooldown_idle{0,100};//闲置冷却, 闲置周期
 
         Decimal perception{300};//感知距离
-        Decimal frequency_attack{0.5};//攻击频率
-        Integer cooldown_attack{100};//攻击冷却
+        Decimal frequency_attack{0.5};//攻击频率(无论是否判定成功都需要冷却)
+        BinaryVector<Integer> cooldown_attack{0,100};//攻击冷却, 攻击周期
 
         Integer number_rest_attack{-1};//剩余攻击次数
         Integer duration_attack{50};//单次攻击的持续时间
@@ -265,13 +275,22 @@ namespace Core
         Decimal damage_rate{1.0};//伤害倍率
         Decimal resist_rate{1.0};//抵抗倍率
         Decimal penetrability_rate{1.0};//穿透倍率
-    };
 
+        //重复数据区域()
+//        bool flag_delete_outside_scene{true};//是否在场景外应该被释放的标记
+//        bool flag_boundary_restriction{false};//边界限制
+//        bool flag_collision{true};//是否考虑碰撞的标记(默认考虑碰撞, 为false时不会受到任何碰撞)
+//        bool flag_channel_collision{false};//同频道是否发生碰撞的标记(默认处于同一频道不会发生碰撞)
+//        Integer team{0};//队伍, 同一队伍间默认不会造成伤害
+//        Integer channel_collision{0};//碰撞频道(处于不同频道的对象会产生碰撞)
+    };
+    using OAP=ObjectActionProperty;
 
     ///方向参照
     enum class DirectionReference
     {
-        RelativeToParentRotation,//相对父对象方向
+        None=-1,//空
+        RelativeToParentDirection,//相对父对象方向
         RelativeToParentSpeed,//相对父对象速度方向
         RelativeToParentAcc,//相对父对象加速度方向
         Absolute//绝对方向
@@ -284,12 +303,12 @@ namespace Core
     class DeriveUnit
     {
     public:
-        Objects::FlyingObject * p{nullptr};//欲放置的对象指针
+        Objects::FlyingObject * object{nullptr};//欲放置的对象指针
         //方向参照(该模式定义了放置时的初始角度, 速度, 加速度的基本参照)
-        DR ref_direction{DR::RelativeToParentRotation};//(默认以基对象的朝向为参照)
+        DR ref_direction{DR::RelativeToParentDirection};//(默认以基对象的朝向为参照)
         bool flag_inherit_speed{true};//继承父对象速度(继承的速度是相对于场景的)
         bool flag_relative_position{true};//相对位置
-        BinaryVector<Decimal> pos{0,0};//初始位置
+        BinaryVector<Decimal> position{0,0};//初始位置
         BinaryVector<Decimal> speed{0,0};//初始速度(极坐标, 若大小小于0, 则使用最大速度)
         BinaryVector<Decimal> acceleration{0,0};//初始加速度(极坐标, 若大小小于0, 则使用最大加速度)
         Decimal rotation{0.0};//初始角度
@@ -301,9 +320,9 @@ namespace Core
     class DeriveRule
     {
     public:
-        int period;//派生最速周期
+        Integer period;//派生最速周期
         QVector<DeriveUnit> units;
-        Integer next{-1};//下一个派生规则
+//        Integer next{-1};//下一个派生规则
     };
 
     ///对象类型
@@ -334,6 +353,8 @@ namespace Core
         //字符串转枚举
         RotationMode string_to_rotation_mode(const QString &str);
 
+        //字符串转枚举
+        DirectionReference string_to_direction_reference(const QString &str);
 
     }
 
@@ -366,7 +387,7 @@ namespace Core
 //        QPointF offset{0.0,0.0};//偏移量
 //        QRectF rect_bounding{};//边界矩形
     public:
-        Element()=delete;
+        Element()=delete;//被删去的默认构造函数
         //构造函数, 指定图片, 指定帧数, 周期
         Element(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10);
         //复制构造函数(复制构造时不会复制父对象指针, 注意基类的复制构造函数被显式删除了)
@@ -397,10 +418,10 @@ namespace Core
     private:
         static Integer seq;
     public:
-        ObjectControlProperty property{};//基本属性
-        ObjectGamingProperty property_gaming{};//gaming状态属性
-
-    protected:
+        ObjectControlProperty property{};//基本属性(用于物理计算)
+        ObjectGamingProperty property_gaming{};//game属性(用于game逻辑计算)
+        ObjectActionProperty property_action{};//行为属性(用于AI控制)
+    public:
         Integer id{0};//id号, 唯一全局标识符(执行构造函数时自动设置, 无需手动设置)
         Integer id_last_collision{-1};//上一个发生碰撞的对象的id号
         Integer id_penetrating{-1};//正在穿透的对象
@@ -425,6 +446,8 @@ namespace Core
 
         //添加到场景
         void add_to_scene(QGraphicsScene *scene);
+        //从场景中移除
+        void remove_from_scene();
         //设置元素
         void set_element(Element*ele);
         //设置元素(重载)
@@ -446,7 +469,7 @@ namespace Core
         ///资源包-对应硬盘上的一个文件夹
         class ResourcePackage
         {
-        private:
+        public:
             //包路径
             QString path_pkg{""};
             //对象文件映射<对象名称, 资源路径>
@@ -455,9 +478,9 @@ namespace Core
             std::map<Integer, QString> map_rule_files{};
 
             //包内的全部图片资源
-            std::vector<QPixmap> pixmaps{};
+            std::map<QString,QPixmap> pixmaps{};
             //包内元素
-            std::vector<Element> elements{};
+            std::vector<Element*> elements{};
             //对象(每一个对象在包内都有唯一的名称, 场景引用资源时也使用名称进行访问)
             std::map<QString, FlyingObject> objects{};
             //派生规则(每一条规则在包内都有唯一的ID号, 供对象使用)
@@ -465,65 +488,77 @@ namespace Core
 
         public:
             //构造函数
-            ResourcePackage();
+            ResourcePackage()=default;
 
         public:
             //设置路径
-            void set_package_path();
+            void set_package_path(const QString &path);
             //加载目标目录下的文件
             void load();
 
+            //清空
+            void clear();
+
 
         private:
+            //加载全部图片文件
+            void load_images();
             //解析对象json文件
-            FlyingObject * parse_json__object(const QString &path);
+            void parse_json__object(const QString &path);
             //解析生成规则json文件
-            DeriveRule * parse_json__derive_rule(const QString &path);
+            void parse_json__derive_rule(const QString &path);
 
         };
-
 
         ///场景生成规则
         class SceneGenerateRule
         {
         public:
             bool flag_in_viewport{false};//是否允许生成在视口内
+            QPointF position{0.0,0.0};//放置位置(横坐标为负代表随机放置)
             Integer requirement_time{0};//时间需求(单位: 更新数)
-            Integer requirement_kills{0};//击杀数需求
+            Integer requirement_score{0};//分数需求
 
             Integer number{1};//生成数量
             QString name_object{""};//要生成的对象的名称
 
             Decimal rotation{0.0};//初始旋转角度, 小于0则随机角度
-            QPointF pos{-1,-1};//生成位置, 分量小于0则随机放置
         };
 
         ///场景(level)-对应一个json文件
         class Scene
         {
-        private:
+        public:
             QString name{"Undefined"};//场景名称
             QString path_file{""};//json文件路径
             QString description{"Undefined"};//描述
+            QString image_internal{""};//内部图片
+            QString image_external{""};//外部图片
             QString name_resource{""};//使用的资源名称
 //            QString
 
             QPoint size{1000,1000};//场景总大小(单位: 像素)
-            QPoint pos{0,0};//初始显示位置(单位: 像素, 指定初始显示视图的左上角对应的场景坐标)
+            QPoint pos_view{0,0};//初始显示位置(单位: 像素, 指定初始显示视图的左上角对应的场景坐标)
+            QPointF pos_initial{0,0};//玩家初始位置(单位: 像素, 指定player最初的位置, 这一条废弃)
 
-            QPixmap preview{};//场景预览
+//            QPixmap preview{};//场景预览(暂时无用)
 
             Integer index_crt_rule{0};//当前生成规则索引
 
-            QVector<SceneGenerateRule> rules;//生成规则(注意生成时只能按照顺序)
+            std::vector<std::pair<SceneGenerateRule,ObjectActionProperty>> rules_generate;//生成规则(注意生成时只能按照顺序)
+            std::vector<Integer> rules_player;
+
+//            ResourcePackage pkg;//资源包
 
         public:
             void set_file_path(const QString &path);
             void load();//加载文件
+            void clear();
         };
 
 
     }
+    using namespace Game;
 
 
     ///运行时数据
@@ -535,16 +570,24 @@ namespace Core
 //        ManipulableObject *p3{nullptr};//player3
 //        ManipulableObject *p4{nullptr};//player3
 
+        Integer num_updates{0};//总数据更新数
+        Integer score{0};//分数
+
         QPointF pos_mouse_scene{0,0};//场景鼠标坐标
 
         QList<Objects::FlyingObject*> list_objects{};//对象列表, 维护所有飞行对象
 
         QMutex mutex{};//互斥量
-
         QReadWriteLock lock{};//读写锁
 
-        Integer index_crt_scene{-1};//当前场景
-        QVector<Game::Scene> scenes;//场景(从场景json文件中读取)
+        ///GV模型
+        GraphicsScene *scene_main{nullptr};//场景
+        GraphicsView * view_main{nullptr};//视图
+
+        size_t index_crt_generate_rule{0};//当前生成规则
+        ///依赖数据
+        ResourcePackage pkg{};//资源包
+        Game::Scene scene{};//场景
 
         //按键状态
         bool status_keys[End_Key]{false};
@@ -555,6 +598,8 @@ namespace Core
         RunTimeData(const RunTimeData&ano)=delete;
         //析构函数
         ~RunTimeData()=default;
+
+        void clear();
     };
 
 
@@ -609,7 +654,10 @@ using namespace Core;
     extern QString path_dir_title_bg;
     //场景文件路径
     extern QString path_scenes;
-
+    //资源文件夹路径
+    extern QString path_resource_pkg;
+    //资源包下图片路径
+    extern QString path_images;
 
 }
 

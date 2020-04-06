@@ -2,15 +2,15 @@
 
 ///全局变量定义
 RunTimeData data_runtime{};
-GraphicsScene *scene_main{nullptr};
-GraphicsView * view_main{nullptr};//视图
+//GraphicsScene *scene_main{nullptr};
+//GraphicsView * view_main{nullptr};//视图
 
 void ObjectsControl::process_data()
 {
         QReadLocker(&data_runtime.lock);//读锁定
 //    QWriteLocker(&data_runtime.lock); //写锁定
 
-
+    ///物理计算
     for (int index = 0; index < data_runtime.list_objects.size(); ++index)
     {
         //        bool flag_max_velocity{false};//满速标记
@@ -67,6 +67,7 @@ void ObjectsControl::process_data()
             pos.first += v_a.first;   //水平位移
             pos.second += v_a.second; //垂直位移
         }
+
         if (pro.flag_boundary_restriction) //边界检查
         {
             if (pos.first < 0)
@@ -74,9 +75,9 @@ void ObjectsControl::process_data()
                 pos.first = 1;
                 v_a.first = 0;
             }
-            if (pos.first > Settings::width_gaming)
+            if (pos.first > data_runtime.scene_main->width())
             {
-                pos.first = Settings::width_gaming-1;
+                pos.first = data_runtime.scene_main->width()-1;
                 v_a.first = 0;
             }
             if (pos.second < 0)
@@ -84,12 +85,13 @@ void ObjectsControl::process_data()
                 pos.second = 1;
                 v_a.second = 0;
             }
-            if (pos.second > Settings::height_gaming)
+            if (pos.second > data_runtime.scene_main->height())
             {
-                pos.second = Settings::height_gaming-1;
+                pos.second = data_runtime.scene_main->height()-1;
                 v_a.second = 0;
             }
         }
+
         ToolFunctionsKit::axis_to_polar(v_a, v_p);
 
         ///角度计算
@@ -213,7 +215,7 @@ void ObjectsControl::process_data()
             continue;//跳过
 
         //获取与当前元素发生碰撞的所有元素
-        auto list= scene_main->collidingItems(p_crt->item);
+        auto list=data_runtime.scene_main->collidingItems(p_crt->item);
 //        QList<QGraphicsItem*> list/*= p_object->item->collidingItems()*/;
 
         bool flag_clear_last_collisio=true;//清空上次碰撞的标记
@@ -252,44 +254,44 @@ void ObjectsControl::process_data()
                 flag_continue=true;//没开标记跳过
 
 
+
+            //都是碰撞对象
+            ///处理game数据
+
+            //获取game数据引用
+            auto &pro_g_crt = p_crt->property_gaming;
+            auto &pro_g_ano = p_another->property_gaming;
+
+            if((pro_g_crt.team==pro_g_ano.team&&(pro_g_crt.flag_team_kill||pro_g_ano.flag_team_kill))||pro_g_crt.team!=pro_g_ano.team)
+                //同队伍但开启了友伤 或 不同队伍
             {
-                //都是碰撞对象
-                ///处理game数据
-
-                //获取game数据引用
-                auto &pro_g_crt = p_crt->property_gaming;
-                auto &pro_g_ano = p_another->property_gaming;
-
-                if((pro_g_crt.team==pro_g_ano.team&&(pro_g_crt.flag_team_kill||pro_g_ano.flag_team_kill))||pro_g_crt.team!=pro_g_ano.team)
-                    //同队伍但开启了友伤 或 不同队伍
+                if(!(p_crt->id_penetrating==p_another->id||p_another->id_penetrating==p_crt->id))
+                    //穿过目标只计算一次伤害
                 {
-                    if(!(p_crt->id_penetrating==p_another->id||p_another->id_penetrating==p_crt->id))
-                        //穿过目标只计算一次伤害
-                    {
-                        //产生伤害
-                        pro_g_crt.endurance.first-=pro_g_ano.damage*pro_g_ano.penetrability/pro_g_crt.resist;
-                        pro_g_ano.endurance.first-=pro_g_crt.damage*pro_g_crt.penetrability/pro_g_ano.resist;
-                        //穿过物体也算作发生碰撞
-                        --p_crt->property.number_rest_collision;
-                        --p_another->property.number_rest_collision;
-                    }
+                    //产生伤害
+                    pro_g_crt.endurance.first-=pro_g_ano.damage*pro_g_ano.penetrability/pro_g_crt.resist;
+                    pro_g_ano.endurance.first-=pro_g_crt.damage*pro_g_crt.penetrability/pro_g_ano.resist;
+                    //穿过物体也算作发生碰撞
+                    --p_crt->property.number_rest_collision;
+                    --p_another->property.number_rest_collision;
                 }
-
-                if(pro_g_crt.penetrability>pro_g_ano.resist||pro_g_ano.penetrability>pro_g_crt.resist)
-                {
-                    //互相设置穿透id
-                    p_crt->id_penetrating=p_another->id;
-                    p_another->id_penetrating=p_crt->id;
-                    flag_continue=true;
-                    flag_clear_last_collisio=false;
-                }
-
             }
 
-            //互斥
-            if(!(p_crt->id_penetrating==p_another->id||p_another->id_penetrating==p_crt->id))
+            if(pro_g_crt.penetrability>pro_g_ano.resist||pro_g_ano.penetrability>pro_g_crt.resist)
             {
-                ///未发生穿透, 则产生互斥
+                //互相设置穿透id
+                p_crt->id_penetrating=p_another->id;
+                p_another->id_penetrating=p_crt->id;
+                flag_continue=true;
+                flag_clear_last_collisio=false;
+            }
+
+
+
+            //坐标互斥
+            if((pro.flag_mutex&&p_another->property.flag_mutex)&&!(p_crt->id_penetrating==p_another->id||p_another->id_penetrating==p_crt->id))
+            {
+                ///互斥标记开启, 且未发生穿透, 则产生互斥
                 //计算互斥后坐标
                 tmp1.first=radian;
                 tmp1.second=Settings::distance_mutex;
@@ -301,12 +303,36 @@ void ObjectsControl::process_data()
                 p_another->property.coordinate.second+=tmp2.second;
             }
 
-            if(flag_continue)//跳过
+            //速度互斥
+            if(pro.force_mutex>0||p_another->property.force_mutex>0)
+            {
+                Decimal force=pro.force_mutex+p_another->property.force_mutex;
+                //计算互斥后产生的加速度
+                tmp1.first=radian;
+
+                //更新互斥后速度
+                tmp1.second=force/pro.mass;
+                ToolFunctionsKit::polar_to_axis(tmp1,tmp2);
+                pro.speed_axis.first-=tmp2.first;
+                pro.speed_axis.second-=tmp2.second;
+                ToolFunctionsKit::axis_to_polar(pro.speed_axis,pro.speed_polar);
+                //更新互斥后速度
+                tmp1.second=force/p_another->property.mass;
+                ToolFunctionsKit::polar_to_axis(tmp1,tmp2);
+                p_another->property.speed_axis.first+=tmp2.first;
+                p_another->property.speed_axis.second+=tmp2.second;
+                ToolFunctionsKit::axis_to_polar(p_another->property.speed_axis,p_another->property.speed_polar);
+            }
+
+
+            if(flag_continue)///跳过
                 continue;
 
             //剩余碰撞计数--
-            --p_crt->property.number_rest_collision;
-            --p_another->property.number_rest_collision;
+            if(p_crt->property.number_rest_collision>0)//不进行判断会产生BUG
+                --p_crt->property.number_rest_collision;
+            if(p_another->property.number_rest_collision>0)
+                --p_another->property.number_rest_collision;
 
             //绝对弧度转为相对于轴的相对弧度
             speed0_r.first-=radian;
@@ -407,14 +433,14 @@ void ObjectsControl::process_data()
 
     }
 
-
+    ///AI控制
 }
 
 void ObjectsControl::manage_objects()
 {
     QWriteLocker(&data_runtime.lock); //写锁定
 
-    //逐个遍历
+    ///对象派生
     for (int index = 0; index < data_runtime.list_objects.size(); ++index)
     {
 
@@ -449,13 +475,16 @@ void ObjectsControl::manage_objects()
                 flag_destroy=true;
         }
 
-        if(flag_destroy)
+        if(flag_destroy)//销毁对象
         {
+            data_runtime.score+=p_crt->property_gaming.score;//计算分数
             //销毁对象
             data_runtime.list_objects.removeAt(index); //删除元素
             if(pro.rule_on_destroy)
-                derive_object(pro, pro.rule_on_destroy); //使用销毁规则进行派生(相当于炉石的亡语)
-            delete p_crt;                                //释放
+                derive_object(pro, data_runtime.pkg.rules_derive[pro.rule_on_destroy]); //使用销毁规则进行派生(亡语)
+            p_crt->remove_from_scene();//从场景中删除对象
+            delete p_crt->item;                         //释放场景元素
+            delete p_crt;                               //释放管理对象
             --index;
             continue;
         }
@@ -471,15 +500,27 @@ void ObjectsControl::manage_objects()
             continue;
         }
         else
-            pro.cooldown_drive = pro.rule->period;//重设冷却
+//            pro.cooldown_drive = pro.rule->period;//重设冷却
+             pro.cooldown_drive=data_runtime.pkg.rules_derive[pro.rule].period;
 
         //! 没有打开标记也应该降低冷却值, 之前这是个BUG
         if (!pro.flag_drive) //派生规则为空, 或标记未打开
             continue;
 
-        derive_object(pro, pro.rule);//使用常驻规则进行派生
+        derive_object(pro, data_runtime.pkg.rules_derive[pro.rule]);//使用常驻规则进行派生
         ++pro.count_drive; //派生计数+1
 
+    }
+
+    //获取当前规则的引用
+    auto & unit=data_runtime.scene.rules_generate[data_runtime.index_crt_generate_rule];
+    ///场景生成
+    if(data_runtime.index_crt_generate_rule<data_runtime.scene.rules_generate.size()
+            &&data_runtime.num_updates>=unit.first.requirement_time&&data_runtime.score>=unit.first.requirement_score)
+    {
+        //满足时间需求, 且满足分数需求
+        generate_object(unit.first,unit.second);//生成对象
+        ++data_runtime.index_crt_generate_rule;//下一条规则
     }
 }
 
@@ -498,18 +539,18 @@ void ObjectsControl::update_property()
     }
 }
 
-void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule *rule)
+void ObjectsControl::derive_object(const ObjectControlProperty &pro,const DeriveRule &rule)
 {
     FlyingObject *obj_new{nullptr};
 
     //逐个遍历派生单元
-    for (const DeriveUnit &unit : rule->units)
+    for (const DeriveUnit &unit : rule.units)
     {
         if(ToolFunctionsKit::get_random_decimal_0_1()>unit.probability)
             continue;
         try
         {
-            obj_new = new FlyingObject(*(unit.p)); //申请新对象
+            obj_new = new FlyingObject(*(unit.object)); //申请新对象
         }
         catch (std::exception &e)
         {
@@ -530,7 +571,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
 
         switch (unit.ref_direction)
         {
-        case DR::RelativeToParentRotation: //相对基对象
+        case DR::RelativeToParentDirection: //相对基对象
         {
             obj_new->property.rotation.first += pro.rotation.first - pro.offset_front;
             break;
@@ -553,11 +594,11 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
 
         ///处理坐标
 
-        obj_new->property.coordinate = unit.pos;
+        obj_new->property.coordinate = unit.position;
         if (unit.flag_relative_position) //相对基对象坐标
         {
             //先将相对的放置坐标转为极坐标
-            ToolFunctionsKit::axis_to_polar(unit.pos, bv_tmp);
+            ToolFunctionsKit::axis_to_polar(unit.position, bv_tmp);
             bv_tmp.first += (obj_new->property.rotation.first + pro.offset_front) * D2R;
             ToolFunctionsKit::polar_to_axis(bv_tmp, obj_new->property.coordinate);
 
@@ -569,7 +610,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
 
         bv_tmp = unit.speed;
         if (unit.speed.second < 0)                         //如果速度大小为负
-            bv_tmp.second = unit.p->property.velocity_max; //使用最大速率
+            bv_tmp.second = unit.object->property.velocity_max; //使用最大速率
         //速度方向修正(以派生对象当前方向为参照)
         bv_tmp.first = bv_tmp.first + obj_new->property.rotation.first * D2R;
         ToolFunctionsKit::polar_to_axis(bv_tmp, obj_new->property.speed_axis); //转为轴坐标
@@ -586,7 +627,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
         ///处理加速度
         bv_tmp = unit.acceleration;
         if (unit.acceleration.second < 0)                      //如果速度大小为负
-            bv_tmp.second = unit.p->property.acceleration_max; //使用最大加速度
+            bv_tmp.second = unit.object->property.acceleration_max; //使用最大加速度
         //速度方向修正(以派生对象当前方向为参照)
         bv_tmp.first = bv_tmp.first + obj_new->property.rotation.first * D2R;
         ToolFunctionsKit::polar_to_axis(bv_tmp, obj_new->property.acceleration_axis); //转为轴坐标
@@ -595,9 +636,87 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro, DeriveRule 
         ToolFunctionsKit::axis_to_polar(obj_new->property.acceleration_axis, obj_new->property.acceleration_polar);
 
         data_runtime.list_objects.push_back(obj_new); //添加到管理列表
-        obj_new->add_to_scene(scene_main);//添加到场景
+        obj_new->add_to_scene(data_runtime.scene_main);//添加到场景
     }
 }
+
+void ObjectsControl::generate_object(const SceneGenerateRule &rule, const ObjectActionProperty &pro_a)
+{
+    if(data_runtime.pkg.objects.find(rule.name_object)==data_runtime.pkg.objects.end())
+        throw QString::asprintf("<ERROR> cannot find object %s in pkg %s",rule.name_object.toStdString().c_str(),data_runtime.pkg.path_pkg.toStdString().c_str());
+    auto &obj_target=data_runtime.pkg.objects[rule.name_object];//获取目标对象引用
+    for(int i=0;i<rule.number;++i)//逐个生成
+    {
+        FlyingObject * obj_new=new FlyingObject(obj_target);//复制构造
+
+        //处理坐标
+        if(rule.position.x()<0)//横坐标小于0, 随机放置
+        {
+            //随机横坐标
+            obj_new->property.coordinate.first=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene_main->width();
+
+            //随机纵坐标
+            if(!rule.flag_in_viewport
+                    &&obj_new->property.coordinate.first>data_runtime.view_main->sceneRect().left()
+                    &&obj_new->property.coordinate.first<data_runtime.view_main->sceneRect().right())//视图内不可放置
+            {
+                //纵坐标可能在视图内
+                if(data_runtime.view_main->sceneRect().top()<0)//顶部无间隙
+                {
+                    obj_new->property.coordinate.second=
+                            ToolFunctionsKit::get_random_decimal_0_1()
+                            *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().bottom())
+                            +data_runtime.view_main->sceneRect().bottom();
+                }
+                else if(data_runtime.view_main->sceneRect().bottom()>data_runtime.scene_main->height())//底部无间隙
+                {
+                    obj_new->property.coordinate.second=
+                            ToolFunctionsKit::get_random_decimal_0_1()
+                            *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().top());
+                }
+                else//上下都有间隙
+                {
+                    if(ToolFunctionsKit::get_random_decimal_0_1()<0.5)//选择上间隙
+                    {
+                        obj_new->property.coordinate.second=
+                                ToolFunctionsKit::get_random_decimal_0_1()
+                                *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().top());
+                    }
+                    else//选择下间隙
+                    {
+                        obj_new->property.coordinate.second=
+                                ToolFunctionsKit::get_random_decimal_0_1()
+                                *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().bottom())
+                                +data_runtime.view_main->sceneRect().bottom();
+                    }
+
+                }
+            }
+            else//视图内可以放置或横坐标不在范围内
+                obj_new->property.coordinate.second=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene.size.ry();
+        }
+        else//固定放置
+        {
+            obj_new->property.coordinate.first=rule.position.x();
+            obj_new->property.coordinate.second=rule.position.y();
+        }
+
+        //处理旋转(方向)
+        if(rule.rotation<0)
+            obj_new->property.rotation.first=360*ToolFunctionsKit::get_random_decimal_0_1();//随机旋转
+        else
+            obj_new->property.rotation.first=rule.rotation;
+
+        obj_new->property_action=pro_a;//设置行为属性
+
+        if(pro_a.flag_player_manip)//player操纵
+            data_runtime.p1=obj_new;//设置
+
+        data_runtime.list_objects.push_back(obj_new); //添加到管理列表
+        obj_new->add_to_scene(data_runtime.scene_main);//添加到场景
+    }
+}
+
 
 
 GameWidget::GameWidget(MainWindow *_main_window)
@@ -625,10 +744,10 @@ void GameWidget::init_components()
 {
     layout_main = new QGridLayout();
     //scene_main并不是字段, 是全局变量
-    scene_main = new GraphicsScene(0, 0, Settings::width_gaming, Settings::height_gaming);
-    scene_main->setItemIndexMethod(QGraphicsScene::NoIndex);//无索引(对于动态元素效果更好)
+    data_runtime.scene_main = new GraphicsScene(0, 0, Settings::width_gaming, Settings::height_gaming);
+    data_runtime.scene_main->setItemIndexMethod(QGraphicsScene::NoIndex);//无索引(对于动态元素效果更好)
 
-    view_main = new GraphicsView(scene_main);
+    data_runtime.view_main = new GraphicsView(data_runtime.scene_main);
 
     //标题页场景
     scene_title=new GraphicsScene(0,0,Settings::width_gaming, Settings::height_gaming);
@@ -640,15 +759,17 @@ void GameWidget::init_components()
     widget_start=new QWidget();
     panel_start=new QWidget();
     list_widget_start=new QListWidget();
-
-
+    widget_log=new QWidget();
     widget_menu = new QWidget();
+    panel_log=new QWidget();
 
     layout_widget_menu = new QGridLayout();
     layout_title=new QGridLayout();
     layout_start=new QGridLayout();
+    layout_log=new QGridLayout();
     layout_panel_title=new QGridLayout();
     layout_panel_start=new QGridLayout();
+    layout_panel_log=new QGridLayout();
 
 
     button_start=new Button("START");
@@ -659,13 +780,18 @@ void GameWidget::init_components()
 
     button_resume_pause_menu = new Button("RESUME");
     button_exit_pause_menu = new Button("EXIT");
+    button_to_info_page_pause_menu= new Button("LOG");
     button_back_start=new Button("BACK");
     button_play_start=new Button("PLAY!");
+    button_close_log=new Button("CLOSE");
 
     label_info_esc_menu = new QLabel();
     label_title=new QLabel();
     label_bottom_info_title=new QLabel();
     label_start_page_top=new QLabel();
+    label_info_page_top=new QLabel();
+
+    browser_info=new QTextBrowser();
 }
 
 void GameWidget::init_UI()
@@ -674,9 +800,9 @@ void GameWidget::init_UI()
     ///总体样式
     this->setStyleSheet(
         //全部
-        "QWidget { background-color:rgba(0,0,0,0.01); color: #ffffff; font-size: 20px; font-family: consolas; }"
+        "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; }"
         //暂停菜单
-        "QWidget#widget_menu { background-color: rgba(00,00,00,0.6); }"
+        "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
         //面板
         "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
         //按钮
@@ -686,12 +812,14 @@ void GameWidget::init_UI()
         "QPushButton::hover{ background-color: rgba(200,200,200,1.0); border: 2px solid #000000; }"
         //面板下
         "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
+        "QWidget#panel > QListWidget::item { border: 2px rgba(0,0,0,0.0); border-bottom: 2px solid #555555; margin: 10px; padding: 10px; }"
+        "QWidget#panel > QListWidget::item:selected { color: #ffffff; background-color: rgba(0,0,0,0.8); border-bottom: 2px solid #00ff00; }"
+        "QWidget#panel > QTextBrowser { border: 2px solid #00ff00; }"
         "QWidget#panel > QPushButton { width: 400px; }"
         "QWidget#panel > QPushButton#refresh { width:200px; border: 2px solid #000000; }"
         //label背景色
-        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; }"
+        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; padding:10px; }"
     );
-
 
 
     ///主窗口
@@ -746,19 +874,14 @@ void GameWidget::init_UI()
     layout_panel_title->addWidget(button_options,2,1,1,2,Qt::AlignCenter);
     layout_panel_title->addWidget(button_exit,3,1,1,2,Qt::AlignCenter);
 
-
-
     widget_main->insertWidget(TitlePage,widget_title);
 
-
-//    view_title->setStyleSheet("QGraphicsView { border: 5px solid #00ff00; }");
 
     ///start页
     widget_start->setLayout(layout_start);
     layout_start->setContentsMargins(0,0,0,0);
 
-    label_start_page_top->setText("Scenes");
-    label_start_page_top->setContentsMargins(5,5,5,5);
+    label_start_page_top->setText("Select Level");
     label_start_page_top->setObjectName("title");
 
     layout_start->addWidget(label_start_page_top,0,0,Qt::AlignLeft);
@@ -782,39 +905,65 @@ void GameWidget::init_UI()
     layout_panel_start->setColumnStretch(2,1);
 
     list_widget_start->setFixedSize(402,500);
-
+    list_widget_start->setSelectionMode(QAbstractItemView::SelectionMode::SingleSelection);//只能单选
+    list_widget_start->setFocusPolicy(Qt::NoFocus);//不聚焦
+    model_selection=list_widget_start->selectionModel();//获取选择集模型
 
     widget_main->insertWidget(StartPage,widget_start);
 
+    ///log页
+    widget_log->setLayout(layout_log);
+    layout_log->setContentsMargins(0,0,0,0);
+
+    label_info_page_top->setText("LOG");
+    label_info_page_top->setObjectName("title");
+    layout_log->addWidget(label_info_page_top,0,0,Qt::AlignLeft);
+    layout_log->addWidget(panel_log,2,0);//面板
+    layout_log->setRowStretch(0,0);
+    layout_log->setRowStretch(1,1);
+    layout_log->setRowStretch(2,5);
+    layout_log->setRowStretch(3,1);
+
+    panel_log->setLayout(layout_panel_log);
+    panel_log->setObjectName("panel");
+
+    browser_info->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
+    layout_panel_log->addWidget(browser_info,0,0);
+    layout_panel_log->addWidget(button_close_log,1,0,Qt::AlignRight);
+
+    widget_main->insertWidget(LogPage,widget_log);
+
+
     ///game页
     auto p =new QOpenGLWidget();
-    view_main->setViewport(p);
-    view_main->setMouseTracking(true);
+    data_runtime.view_main->setViewport(p);
+    data_runtime.view_main->setMouseTracking(true);
 
-    view_main->setContentsMargins(0,0,0,0);
-    view_main->setSceneRect(0,0,view_main->width(),view_main->height());
+    data_runtime.view_main->setContentsMargins(0,0,0,0);
+    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width(),data_runtime.view_main->height());
 
     //关闭滚动条
-    view_main->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); //水平
-    view_main->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);   //垂直
+    data_runtime.view_main->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); //水平
+    data_runtime.view_main->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);   //垂直
 
 //    this->setLayout(layout_gird_main);
 //    layout_gird_main->setContentsMargins(2, 2, 2, 2);
 //    layout_gird_main->addWidget(widget_main);
 
-    widget_main->insertWidget(GamePage,view_main);
+    widget_main->insertWidget(GamePage,data_runtime.view_main);
 
     //主界面设置
 
 
-    ///暂停菜单
+    ///暂停页
     widget_menu->setLayout(layout_widget_menu);
 
     layout_widget_menu->setSpacing(10);
-    layout_widget_menu->addWidget(label_info_esc_menu, 0, 0, Qt::AlignTop | Qt::AlignTop);
+    layout_widget_menu->addWidget(label_info_esc_menu, 0, 0, Qt::AlignTop | Qt::AlignLeft);
     layout_widget_menu->setRowStretch(1, 10);
     layout_widget_menu->addWidget(button_resume_pause_menu, 2, 0, Qt::AlignLeft);
-    layout_widget_menu->addWidget(button_exit_pause_menu, 3, 0, Qt::AlignLeft);
+    layout_widget_menu->addWidget(button_to_info_page_pause_menu, 3, 0, Qt::AlignLeft);
+    layout_widget_menu->addWidget(button_exit_pause_menu, 4, 0, Qt::AlignLeft);
 
     label_info_esc_menu->setText("Barrage Simulator");
     label_info_esc_menu->setObjectName("title");
@@ -823,9 +972,6 @@ void GameWidget::init_UI()
     widget_menu->setVisible(false); //不可见
     widget_menu->raise();           //置于顶层
     widget_menu->setObjectName("widget_menu");
-
-
-
 
 
     //各种组件的尺寸初始设置
@@ -844,13 +990,20 @@ void GameWidget::init_signal_slots()
     connect(&timer, &QTimer::timeout, this, &GameWidget::update);
     connect(&timer_title, &QTimer::timeout, this, &GameWidget::update_bg_image_position);
 
-    //发生消息给控制台
-    connect(object_thread_data_process, &ObjectsControl::push_info, main_window, &MainWindow::push_info);
+    //消息推送
+    connect(object_thread_data_process, &ObjectsControl::signal_push_info, this, &GameWidget::push_info);
+    connect(this, &GameWidget::signal_push_info, main_window, &MainWindow::push_info);
+    connect(this, &GameWidget::signal_push_info, this, &GameWidget::push_info);
 
     //按钮
     connect(button_resume_pause_menu, &QPushButton::clicked, this, &GameWidget::esc);
+    connect(button_to_info_page_pause_menu, &QPushButton::clicked, this, &GameWidget::goto_log_page);
+    connect(button_close_log, &QPushButton::clicked, this, &GameWidget::close_log_page);
     connect(button_start, &QPushButton::clicked, this, &GameWidget::goto_start_page);
     connect(button_back_start, &QPushButton::clicked, this, &GameWidget::goto_title_page);
+    connect(button_refresh_start, &QPushButton::clicked, this, &GameWidget::load_scene_list);
+    connect(model_selection, &QItemSelectionModel::selectionChanged,this,&GameWidget::handle_select);
+    connect(button_play_start, &QPushButton::clicked,this,&GameWidget::load_scene);
 
 }
 
@@ -904,7 +1057,7 @@ void GameWidget::load_title_images()
 
 void GameWidget::key_process()
 {
-    if(widget_main->currentIndex()==GamePage)
+    if(widget_main->currentIndex()==GamePage&&this->status==Status::Running&&data_runtime.p1!=nullptr)//检查状态
     {
         data_runtime.p1->property.mode_movement = MovementMode::Unlimited; //无限制运动
 
@@ -1021,27 +1174,90 @@ void GameWidget::esc()
 
     if (active) //当前处于暂停状态
     {
-        this->timer.start(); //开启计时器
+        if(this->widget_main->currentIndex()==GamePage)
+        {
+            this->timer.start(); //开启计时器
+            this->status=Status::Running;//状态设为运行(继续运行)
+        }
+
         this->widget_menu->setVisible(false);
     }
     else
     {
-        this->timer.stop(); //停止计时器
+        if(this->widget_main->currentIndex()==GamePage)
+        {
+            this->timer.stop(); //停止计时器
+            this->status=Status::Pause;//状态设为暂停
+        }
         this->widget_menu->setVisible(true);
     }
     active = !active;
 }
 
+void GameWidget::goto_page(GameWidget::Page page)
+{
+    emit signal_push_info(QString::asprintf("<function called> GameWidget::goto_page(%d)",page));
+    page_last=static_cast<Page>(widget_main->currentIndex());
+    widget_main->setCurrentIndex(page);
+}
+
 void GameWidget::clear()
 {
-    qDebug()<<"<called> clear()";
-    //析构全部对象
-    for(auto p_object:data_runtime.list_objects)
-        delete p_object;
+    emit signal_push_info("<function called> GameWidget::clear()");
+    data_runtime.clear();
+}
+
+void GameWidget::load_scene()
+{
+    emit signal_push_info("<function called> GameWidget::load_scene()");
+
+    //获取选中的文件名
+    QString path_scene_file=path_scene_files.at(model_selection->selectedRows()[0].row());
+    path_scene_file=Settings::path_scenes+path_scene_file;
+
+    try
+    {
+        data_runtime.scene.set_file_path(path_scene_file);//设置场景路径
+        data_runtime.scene.load();//加载场景文件
+
+        data_runtime.pkg.set_package_path(Settings::path_resource_pkg+data_runtime.scene.name_resource);
+        data_runtime.pkg.load();//加载资源文件
+
+        data_runtime.scene_main->setSceneRect(0,0,data_runtime.scene.size.rx(),data_runtime.scene.size.ry());
+        const auto &rect = data_runtime.scene_main->sceneRect();
+        data_runtime.view_main->setSceneRect(-rect.right(),-rect.bottom(),3*rect.width(),3*rect.height());
+
+        if(data_runtime.scene.image_internal.size()>0)
+        {
+            //设置笔刷
+            data_runtime.scene_main->brush_internal.setTexture(data_runtime.pkg.pixmaps[data_runtime.scene.image_internal]);
+        }
+
+        if(data_runtime.scene.image_external.size()>0)
+        {
+            //设置笔刷
+            data_runtime.scene_main->brush_external.setTexture(data_runtime.pkg.pixmaps[data_runtime.scene.image_external]);
+        }
+
+        goto_page(GamePage);
+
+        this->timer_title.stop();//关闭主界面
+        this->status=Status::Running;
+        this->timer.start(Settings::interval);
+    }
+    catch (const QString &e)
+    {
+        qDebug()<<e;
+        emit signal_push_info(e);
+    }
 }
 
 void GameWidget::load_scene_list()
 {
+    emit signal_push_info("<function called> GameWidget::load_scene_list()");
+
+    list_widget_start->clear();
+
     QDir dir(Settings::path_scenes);
     if(!dir.exists())
     {
@@ -1049,9 +1265,22 @@ void GameWidget::load_scene_list()
         return;
     }
     QStringList filter{"*.json"};
-    QStringList path_files=dir.entryList(filter,QDir::Readable,QDir::Name);
+    //获取文件路径
+    path_scene_files=dir.entryList(filter,QDir::Readable|QDir::Files,QDir::Name);
+
+    list_widget_start->addItems(path_scene_files);
+
 }
 
+void GameWidget::handle_select()
+{
+    auto rows=model_selection->selectedRows();
+
+    if(rows.size()==1)
+        this->button_play_start->setEnabled(true);
+    else
+        this->button_play_start->setEnabled(false);
+}
 
 void GameWidget::initialize()
 {
@@ -1084,21 +1313,38 @@ void GameWidget::exec()
 
 void GameWidget::test()
 {
-    data_runtime.p1 = new FlyingObject(objects_inner[InnerObjects::Block_zero_blue]);
-    data_runtime.p1->property.coordinate = {100, 100};
-    data_runtime.p1->add_to_scene(scene_main);    //添加到场景
-    data_runtime.list_objects << data_runtime.p1; //添加到对象列表中
+//    data_runtime.p1 = new FlyingObject(objects_inner[InnerObjects::Block_zero_blue]);
+//    data_runtime.p1->property.coordinate = {100, 100};
+//    data_runtime.p1->add_to_scene(scene_main);    //添加到场景
+//    data_runtime.list_objects << data_runtime.p1; //添加到对象列表中
 
-    auto p = new FlyingObject(objects_inner[InnerObjects::Block_zero_red]);
-    p->property.coordinate={500,200};
-    p->add_to_scene(scene_main);    //添加到场景
-    data_runtime.list_objects << p; //添加到对象列表中
+//    auto p = new FlyingObject(objects_inner[InnerObjects::Block_zero_red]);
+//    p->property.coordinate={500,200};
+//    p->add_to_scene(scene_main);    //添加到场景
+//    data_runtime.list_objects << p; //添加到对象列表中
 
-    initialize();//初始化
+//    initialize();//初始化
 
-    this->setVisible(true);
+//    this->setVisible(true);
 
-    Settings::reset_key_map(); //重置/初始化键位
+//    Settings::reset_key_map(); //重置/初始化键位
+
+//    this->widget_main->setCurrentIndex(GamePage);
+
+
+
+    try
+    {
+        ResourcePackage pkg;
+        pkg.set_package_path("./data/resources/default");
+        pkg.load();//加载包
+    }
+    catch (const QString & e)
+    {
+        qDebug()<<e;
+    }
+
+
 }
 
 void GameWidget::update()
@@ -1118,32 +1364,42 @@ void GameWidget::update()
     info_status_bar.time_consumption=tt;
 
 
-    info_status_bar.pos_mouse = view_main->pos_mouse;                                //鼠标坐标
+    info_status_bar.pos_mouse = data_runtime.view_main->pos_mouse;                                //鼠标坐标
     info_status_bar.num_updates = num_updates;                                       //更新数
     info_status_bar.num_objects = data_runtime.list_objects.size();                  //对象数量
-    data_runtime.pos_mouse_scene = view_main->mapToScene(info_status_bar.pos_mouse); //鼠标坐标
+    data_runtime.pos_mouse_scene = data_runtime.view_main->pos_mouse; //鼠标坐标
 
     emit signal_send_status_bar_info(&this->info_status_bar); //更新状态栏信息
-
-    key_process(); //按键处理
 
     if (cooldown_next_data_update == 0)
     {
 //        emit signal_process_data(); //发送信号, 子线程处理数据
 
-        ObjectsControl::process_data();
-        ObjectsControl::manage_objects();  //管理对象
-        ObjectsControl::update_property(); //主线程更新界面属性
-
+        try
+        {
+            ObjectsControl::process_data();    //数据处理
+            ObjectsControl::manage_objects();  //管理对象
+            ObjectsControl::update_property(); //更新元素属性
+        }
+        catch(const QString &e)
+        {
+            emit signal_push_info(e);
+            this->status=Status::Over;//运行结束
+        }
         cooldown_next_data_update = Settings::period_data_update;
 
         if (mouse_delay > 0)
             --mouse_delay;
+
+        data_runtime.view_main->centerOn(data_runtime.p1->item);//保持中心
+
+        ++data_runtime.num_updates;//更新数据更新数
     }
+    key_process(); //按键处理
 
     --cooldown_next_data_update;
 
-    view_main->update(); //视图更新
+    data_runtime.view_main->update(); //视图更新
 //    view_main->viewport()->update();
 //    view_main->repaint();
     ++num_updates;
@@ -1224,16 +1480,56 @@ void GameWidget::update_bg_image_position()
     ++count;
 }
 
+void GameWidget::push_info(const QString &message)
+{
+    qDebug()<<"asdf";
+    this->browser_info->append(message);
+    this->browser_info->update();//刷新
+}
+
 void GameWidget::goto_start_page()
 {
-    this->widget_main->setCurrentIndex(StartPage);
+    this->goto_page(StartPage);
+    this->load_scene_list();//加载场景列表
 }
 
 void GameWidget::goto_title_page()
 {
-    this->widget_main->setCurrentIndex(TitlePage);
+    this->goto_page(TitlePage);
 }
 
+void GameWidget::goto_log_page()
+{
+    this->button_to_info_page_pause_menu->setEnabled(false);//不可用
+    this->goto_page(LogPage);
+    esc();
+}
+
+void GameWidget::close_log_page()
+{
+    this->button_to_info_page_pause_menu->setEnabled(true);//不可用
+    goto_page(page_last);//返回
+}
+
+void GameWidget::exit()
+{
+    Page page_crt=static_cast<Page>(widget_main->currentIndex());
+
+    switch(page_crt)
+    {
+    case TitlePage:
+    {
+
+    }
+    [[clang::fallthrough]];
+    case StartPage:
+    {
+        break;
+    }
+
+    }
+
+}
 
 
 void GameWidget::keyPressEvent(QKeyEvent *event)
@@ -1268,6 +1564,8 @@ void GameWidget::keyReleaseEvent(QKeyEvent *event)
 
 void GameWidget::mousePressEvent(QMouseEvent *event)
 {
+    if(this->status!=Status::Running)//检查运行状态
+        return;
     if (event->buttons() & Qt::LeftButton)
     {
         data_runtime.status_keys[Key::ML] = true;
@@ -1281,6 +1579,8 @@ void GameWidget::mousePressEvent(QMouseEvent *event)
 
 void GameWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    if(this->status!=Status::Running)//检查运行状态
+        return;
     if (!event->buttons() & Qt::LeftButton)
     {
         data_runtime.status_keys[Key::ML] = false;
@@ -1296,7 +1596,7 @@ void GameWidget::resizeEvent(QResizeEvent *event)
     this->view_title->resize(event->size());
     this->widget_menu->resize(event->size());
 
-    view_main->setSceneRect(0,0,view_main->width()-1,view_main->height()-1);
+//    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width()-1,data_runtime.view_main->height()-1);
     view_title->setSceneRect(-view_title->width()/2,-view_title->height()/2,view_title->width(),view_title->height());
 }
 

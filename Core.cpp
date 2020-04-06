@@ -67,6 +67,10 @@ namespace Settings
     QString path_dir_title_bg="./data/images/images_background_title/";
     //场景文件路径
     QString path_scenes="./data/levels/";
+    //资源文件夹路径
+    QString path_resource_pkg="./data/resources/";
+    //
+    QString path_images="/images/";
 
 
 }
@@ -77,6 +81,7 @@ Core::Objects::Element::Element(const QPixmap &_pixmap, const int &_number_frame
 //    ,number_frame(_number_frame)
 //    ,period_frame(_period_frame)
 {
+//    qDebug()<<"<called> constructor of Element";
     this->set_frames(_pixmap,_number_frame,_period_frame);//设置帧
 }
 
@@ -141,32 +146,6 @@ bool Core::Objects::Element::collidesWithItem(const QGraphicsItem *other, Qt::It
     return this->QGraphicsPixmapItem::collidesWithItem(other, mode);
 }
 
-//void Core::Objects::Element::set_offset(const QPointF &offset)
-//{
-//    this->offset = offset;
-//}
-
-//void Core::Objects::Element::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
-//{
-//    Q_UNUSED(widget)
-//    Q_UNUSED(option)
-//    painter->drawPixmap(offset,this->frames[frame_current]);
-//}
-
-//QPainterPath Core::Objects::Element::shape() const
-//{
-//    const QBitmap &ref = this->frames[frame_current].mask();
-
-//    QPainterPath p;
-
-//    QGraphicsPixmapItem;
-
-//}
-
-//QRectF Core::Objects::Element::boundingRect() const
-//{
-//    return rect_bounding;
-//}
 
 Integer Core::Objects::FlyingObject::seq=-1;
 
@@ -184,14 +163,7 @@ Core::Objects::FlyingObject::FlyingObject(const QString &name)
 
 Core::Objects::FlyingObject::~FlyingObject()
 {
-    if(this->item)
-    {
-        const auto &p=this->item->scene();
-        if(p!=nullptr)//如果存在场景
-            p->removeItem(this->item);//先从场景中删除对象及其子对象
-        delete this->item;//释放空间
-        this->item=nullptr;//重置为nullptr
-    }
+
 }
 
 Core::Objects::FlyingObject::FlyingObject(const Core::Objects::FlyingObject &ano)
@@ -240,6 +212,11 @@ void Core::Objects::FlyingObject::add_to_scene(QGraphicsScene *scene)
     scene->addItem(this->item);
 }
 
+void FlyingObject::remove_from_scene()
+{
+    this->item->scene()->removeItem(this->item);
+}
+
 void Core::Objects::FlyingObject::set_element(Element*ele)
 {
     auto half = (ele->pixmap().size()/2);
@@ -279,24 +256,20 @@ void Core::Objects::FlyingObject::initialize()
 
 
 
-
-//Core::Objects::ManipulableObject::ManipulableObject()
-//{
-//    type=ObjectType::ManipulableObject;//更改类型, 碰撞对象
-//}
-
-//Core::Objects::ManipulableObject::ManipulableObject(const Core::Objects::ManipulableObject &ano)
-//    :FlyingObject(ano)
-//    ,property_gaming(ano.property_gaming)
-//{
-
-//}
-
-
 Core::RunTimeData::RunTimeData()
 {
     for(int i=0;i<End_Key;++i)
         status_keys[i]=false;
+}
+
+void RunTimeData::clear()
+{
+    //析构全部对象
+    for(auto p_object:this->list_objects)
+        delete p_object;
+    this->pkg.clear();//资源包清空
+    this->scene.clear();//场景清空
+    this->score=0;//重置分数
 }
 
 void Core::Definition::ObjectControlProperty::initialize()
@@ -377,7 +350,19 @@ RotationMode ToolFunctionsKit::string_to_rotation_mode(const QString &str)
 
 }
 
-
+DirectionReference ToolFunctionsKit::string_to_direction_reference(const QString &str)
+{
+    if(str=="RelativeToParentDirection")
+        return DirectionReference::RelativeToParentDirection;
+    else if(str=="RelativeToParentSpeed")
+        return DirectionReference::RelativeToParentSpeed;
+    else if(str=="RelativeToParentAcc")
+        return DirectionReference::RelativeToParentAcc;
+    else if(str=="Absolute")
+        return DirectionReference::Absolute;
+    else
+        return DirectionReference::None;
+}
 
 
 Core::Definition::Decimal Core::ToolFunctionsKit::get_random_decimal_0_1()
@@ -389,10 +374,9 @@ Core::Definition::Decimal Core::ToolFunctionsKit::get_random_decimal_0_1()
 
 
 
-
-void Game::ResourcePackage::set_package_path()
+void Game::ResourcePackage::set_package_path(const QString &path)
 {
-
+    this->path_pkg=path+'/';
 }
 
 void Game::ResourcePackage::load()
@@ -404,18 +388,61 @@ void Game::ResourcePackage::load()
     if(!dir.exists())
         throw QString::asprintf("<ERROR> DIR %s not found",path_pkg.toStdString().c_str());
 
+    QStringList filters{"*.json"};
+    //获取json文件列表
+    QStringList list_files=dir.entryList(filters,QDir::Readable|QDir::Files,QDir::Name);
+
+
+    this->load_images();//加载全部图片
+    for(QString path:list_files)
+    {
+        if(path[0]=='o')//对象文件(子母o开头)
+            this->parse_json__object(path);
+        else if(path[0]=='r')
+            this->parse_json__derive_rule(path);
+    }
+
 }
 
-FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
+void ResourcePackage::clear()
+{
+    new (this)ResourcePackage();//调用默认构造函数重新构造
+}
+
+void ResourcePackage::load_images()
+{
+    QDir dir;
+    QString path_dir=this->path_pkg+Settings::path_images;
+    dir.setPath(path_dir);
+
+    //检查目录是否存在
+    if(!dir.exists())
+        throw QString::asprintf("<ERROR> DIR %s not found",dir.path().toStdString().c_str());
+
+    QStringList filters{"*.png","*.jpg","*.jpeg"};
+    //获取图片文件列表
+    QStringList list_files=dir.entryList(filters,QDir::Readable|QDir::Files,QDir::Name);
+
+    QPixmap pixmap;
+    for(QString name:list_files)
+    {
+        if(!pixmap.load(path_dir+name))
+            throw QString::asprintf("<ERROR> fail to load image FILE %s",name.toStdString().c_str());
+        this->pixmaps[name]=pixmap;//添加到容器中
+    }
+
+}
+
+void Game::ResourcePackage::parse_json__object(const QString &path)
 {
     QFile file;
-    file.setFileName(path);
+    file.setFileName(this->path_pkg+path);
 
     //检查文件是否存在
     if(!file.exists())
-        throw QString::asprintf("<ERROR> FILE %s not found",path.toStdString().c_str());
+        throw QString::asprintf("<ERROR> FILE %s not found",file.fileName().toStdString().c_str());
 
-    //打开文件
+    //打开文件(只读|文本)
     file.open(QIODevice::ReadOnly | QIODevice::Text);
     //读取所有内容
     QString content = file.readAll();
@@ -425,43 +452,36 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
     QJsonParseError error_json;//解析错误
     QJsonDocument doc_json;//json文档
 
-    doc_json.fromJson(content.toUtf8(),&error_json);
+    doc_json=QJsonDocument::fromJson(content.toUtf8(),&error_json);
 
     if(error_json.error!=QJsonParseError::NoError)
         throw QString::asprintf("<ERROR> %s",error_json.errorString().toStdString().c_str());
 
+    QJsonObject root=doc_json.object();//获取根对象
 
-
-    QJsonObject obj_json_root=doc_json.object();//获取根对象
-
-    QStringList keys = obj_json_root.keys();//获取所有键
-
-
+//    qDebug()<<root.keys();
 
 
     ///---------------------------------------------------------------------------开始解析
     FlyingObject obj_new;
 
-    QString name;///name(*)
-    if(obj_json_root.contains("name"))
+    QString name;///name*
+    if(root.contains("name"))
     {
-        QJsonValue value = obj_json_root.value("name");
+        QJsonValue value = root.value("name");
         if(!value.isString())
             throw QString::asprintf("<ERROR> type of KEY \"name\" is not correct in FILE %s",path.toStdString().c_str());
         name=value.toString();
         obj_new.set_name(name);
     }
 
-
-    //容器中添加一个对象
-    objects[name]=obj_new;
-    FlyingObject & ref_obj_new = objects[name];
+//    FlyingObject & obj_new = objects[name];
 
 
     QPointF center{-1.0,-1.0};///center
-    if(obj_json_root.contains("center"))
+    if(root.contains(QStringLiteral("center")))
     {
-        QJsonValue center_v=obj_json_root.value("center");
+        QJsonValue center_v=root.value("center");
         if(!center_v.isArray())
             throw QString::asprintf("<ERROR> type of KEY \"center\" is not correct in FILE %s",path.toStdString().c_str());
 
@@ -479,12 +499,12 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
     }
     else
         //非可选键未找到, 抛出异常
-        throw QString::asprintf("<ERROR> KEY \"center\" not found in FILE %s",error_json.errorString().toStdString().c_str());
+        throw QString::asprintf("<ERROR> KEY \"center\" not found in FILE %s",path.toStdString().c_str());
 
     int number_frame=1;///number_frame*
-    if(obj_json_root.contains("number_frame"))
+    if(root.contains("number_frame"))
     {
-        QJsonValue number_frame_v = obj_json_root.value("number_frame");
+        QJsonValue number_frame_v = root.value("number_frame");
 
         if(!number_frame_v.isDouble())
             throw QString::asprintf("<ERROR> type of KEY \"number_frame\" is not correct in FILE %s",path.toStdString().c_str());
@@ -492,9 +512,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
     }
 
     int interval=-1;///interval*
-    if(obj_json_root.contains("interval"))
+    if(root.contains("interval"))
     {
-        QJsonValue interval_v = obj_json_root.value("interval");
+        QJsonValue interval_v = root.value("interval");
 
         if(!interval_v.isDouble())
             throw QString::asprintf("<ERROR> type of KEY \"interval\" is not correct in FILE %s",path.toStdString().c_str());
@@ -503,58 +523,57 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
 
     ///file_path
-    if(obj_json_root.contains("file_path"))
+    if(root.contains("file_name"))
     {
-        QJsonValue file_path = obj_json_root.value("file_path");
-        if(!file_path.isString())
-            throw QString::asprintf("<ERROR> type of KEY \"file_path\" type is not correct in FILE %s",path.toStdString().c_str());
+        QJsonValue value = root.value("file_name");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"file_name\" type is not correct in FILE %s",path.toStdString().c_str());
 
-        pixmaps.emplace_back();//容器中添加一个对象(调用默认构造函数原地构造)
-        pixmaps.back().load(this->path_pkg+file_path.toString());//加载图片文件
+        QString name=value.toString();
 
-        elements.emplace_back(pixmaps.back(),number_frame,interval);//原地构造
+        Element * p_new_ele=new Element(pixmaps[name],number_frame,interval);
+        elements.push_back(p_new_ele);
 
-        ref_obj_new.set_element(&elements.back(),center);//设置元素
+        obj_new.set_element(elements.back(),center);//设置元素
+
     }
     else
         //非可选键未找到, 抛出异常
-        throw QString::asprintf("<ERROR> KEY \"file_path\" not found in FILE %s",error_json.errorString().toStdString().c_str());
+        throw QString::asprintf("<ERROR> KEY \"file_name\" not found in FILE %s",error_json.errorString().toStdString().c_str());
 
     ///property
-    if(obj_json_root.contains("property"))
+    if(root.contains("property"))
     {
         //获取property对象
-        QJsonObject property = obj_json_root.value("property").toObject();
+        QJsonObject obj_property = root.value("property").toObject();
 
-        auto & pro = ref_obj_new.property;
+        auto & pro = obj_new.property;
 
 
         ///---------------------------------------------------------------------------数值型
 
-        Integer lifetime=pro.lifetime;///lifetime*
-        if(property.contains("lifetime"))
+        ///lifetime*
+        if(obj_property.contains("lifetime"))
         {
-            QJsonValue lifetime_v = property.value("lifetime");
-            if(!lifetime_v.isDouble())
+            QJsonValue value = obj_property.value("lifetime");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.lifetime\" is not correct in FILE %s",path.toStdString().c_str());
-            lifetime=lifetime_v.toInt();
-            pro.lifetime=lifetime;
+            pro.lifetime=value.toInt();
         }
 
-        Integer channel_collision=pro.channel_collision;///channel_collision*
-        if(property.contains("channel_collision"))
+        ///channel_collision*
+        if(obj_property.contains("channel_collision"))
         {
-            QJsonValue channel_collision_v = property.value("channel_collision");
-            if(!channel_collision_v.isDouble())
+            QJsonValue value = obj_property.value("channel_collision");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.channel_collision\" is not correct in FILE %s",path.toStdString().c_str());
-            channel_collision=channel_collision_v.toInt();
-            pro.channel_collision=channel_collision;
+            pro.channel_collision=value.toInt();
         }
 
         Integer number_rest_collision=pro.number_rest_collision;///number_rest_collision*
-        if(property.contains("number_rest_collision"))
+        if(obj_property.contains("number_rest_collision"))
         {
-            QJsonValue number_rest_collision_v = property.value("number_rest_collision");
+            QJsonValue number_rest_collision_v = obj_property.value("number_rest_collision");
             if(!number_rest_collision_v.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.number_rest_collision\" is not correct in FILE %s",path.toStdString().c_str());
             number_rest_collision=number_rest_collision_v.toInt();
@@ -562,103 +581,120 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         }
 
         Integer rule/*=pro.rule*/;///rule*
-        if(property.contains("rule"))
+        if(obj_property.contains("rule"))
         {
-            QJsonValue rule_v = property.value("rule");
-            if(!rule_v.isDouble())
+            QJsonValue value = obj_property.value("rule");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.rule\" is not correct in FILE %s",path.toStdString().c_str());
-            rule=rule_v.toInt();
+            rule=value.toInt();
 //            pro.rule=rule;
         }
 
         Integer rule_on_collision/*=pro.rule_on_collision*/;///rule_on_collision*
-        if(property.contains("rule_on_collision"))
+        if(obj_property.contains("rule_on_collision"))
         {
-            QJsonValue rule_on_collision_v = property.value("rule_on_collision");
-            if(!rule_on_collision_v.isDouble())
+            QJsonValue value = obj_property.value("rule_on_collision");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.rule_on_collision\" is not correct in FILE %s",path.toStdString().c_str());
-            rule_on_collision=rule_on_collision_v.toInt();
+            rule_on_collision=value.toInt();
 //            pro.rule_on_collision=rule_on_collision;
         }
 
         Integer rule_on_destroy/*=pro.rule_on_destroy*/;///rule_on_destroy*
-        if(property.contains("rule_on_destroy"))
+        if(obj_property.contains("rule_on_destroy"))
         {
-            QJsonValue rule_on_destroy_v = property.value("rule_on_destroy");
-            if(!rule_on_destroy_v.isDouble())
+            QJsonValue value = obj_property.value("rule_on_destroy");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.rule_on_destroy\" is not correct in FILE %s",path.toStdString().c_str());
-            rule_on_destroy=rule_on_destroy_v.toInt();
+            rule_on_destroy=value.toInt();
 //            pro.rule_on_destroy=rule_on_destroy;
         }
 
-        Decimal mass=pro.mass;///mass*
-        if(property.contains("mass"))
+        ///mass*
+        if(obj_property.contains("mass"))
         {
-            QJsonValue mass_v = property.value("mass");
-            if(!mass_v.isDouble())
+            QJsonValue value = obj_property.value("mass");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.mass\" is not correct in FILE %s",path.toStdString().c_str());
-            mass=mass_v.toDouble();
-            pro.mass=mass;
+            pro.mass=value.toDouble();
+        }
+
+        ///force_mutex*
+        if(obj_property.contains("force_mutex"))
+        {
+            QJsonValue value = obj_property.value("force_mutex");
+            if(!value.isDouble())
+                throw QString::asprintf("<ERROR> type of KEY \"property.force_mutex\" is not correct in FILE %s",path.toStdString().c_str());
+            pro.force_mutex=value.toDouble();
         }
 
 
-        Decimal inertia_rotational=pro.inertia_rotational;///inertia_rotational*
-        if(property.contains("inertia_rotational"))
+        ///inertia_rotational*
+        if(obj_property.contains("inertia_rotational"))
         {
-            QJsonValue inertia_rotational_v = property.value("inertia_rotational");
-            if(!inertia_rotational_v.isDouble())
+            QJsonValue value = obj_property.value("inertia_rotational");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.inertia_rotational\" is not correct in FILE %s",path.toStdString().c_str());
-            inertia_rotational=inertia_rotational_v.toDouble();
-            pro.inertia_rotational=inertia_rotational;
+            pro.inertia_rotational=value.toDouble();
         }
 
         Decimal elasticity=pro.elasticity;///elasticity*
-        if(property.contains("elasticity"))
+        if(obj_property.contains("elasticity"))
         {
-            QJsonValue elasticity_v = property.value("elasticity");
-            if(!elasticity_v.isDouble())
+            QJsonValue value = obj_property.value("elasticity");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.elasticity\" is not correct in FILE %s",path.toStdString().c_str());
-            elasticity=elasticity_v.toDouble();
+            elasticity=value.toDouble();
             pro.elasticity=elasticity;
         }
 
         Decimal velocity_max=pro.velocity_max;///velocity_max*
-        if(property.contains("velocity_max"))
+        if(obj_property.contains("velocity_max"))
         {
-            QJsonValue velocity_max_v = property.value("velocity_max");
-            if(!velocity_max_v.isDouble())
+            QJsonValue value = obj_property.value("velocity_max");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.velocity_max\" is not correct in FILE %s",path.toStdString().c_str());
-            velocity_max=velocity_max_v.toDouble();
+            velocity_max=value.toDouble();
             pro.velocity_max=velocity_max;
         }
 
         Decimal acceleration_max=pro.acceleration_max;///acceleration_max*
-        if(property.contains("acceleration_max"))
+        if(obj_property.contains("acceleration_max"))
         {
-            QJsonValue acceleration_max_v = property.value("acceleration_max");
-            if(!acceleration_max_v.isDouble())
+            QJsonValue value = obj_property.value("acceleration_max");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.acceleration_max\" is not correct in FILE %s",path.toStdString().c_str());
-            acceleration_max=acceleration_max_v.toDouble();
+            acceleration_max=value.toDouble();
             pro.acceleration_max=acceleration_max;
         }
 
         Decimal attenuation_velocity=pro.attenuation_velocity;///attenuation_velocity*
-        if(property.contains("attenuation_velocity"))
+        if(obj_property.contains("attenuation_velocity"))
         {
-            QJsonValue attenuation_velocity_v = property.value("attenuation_velocity");
-            if(!attenuation_velocity_v.isDouble())
+            QJsonValue value = obj_property.value("attenuation_velocity");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.attenuation_velocity\" is not correct in FILE %s",path.toStdString().c_str());
-            attenuation_velocity=attenuation_velocity_v.toDouble();
+            attenuation_velocity=value.toDouble();
             pro.attenuation_velocity=attenuation_velocity;
         }
 
-        Decimal coefficient_friction=pro.coefficient_friction;///coefficient_friction*
-        if(property.contains("coefficient_friction"))
+        Decimal offset_front=pro.offset_front;///offset_front*
+        if(obj_property.contains("offset_front"))
         {
-            QJsonValue coefficient_friction_v = property.value("coefficient_friction");
-            if(!coefficient_friction_v.isDouble())
+            QJsonValue value = obj_property.value("offset_front");
+            if(!value.isDouble())
+                throw QString::asprintf("<ERROR> type of KEY \"property.offset_front\" is not correct in FILE %s",path.toStdString().c_str());
+            offset_front=value.toDouble();
+            pro.offset_front=offset_front;
+        }
+
+        Decimal coefficient_friction=pro.coefficient_friction;///coefficient_friction*
+        if(obj_property.contains("coefficient_friction"))
+        {
+            QJsonValue value = obj_property.value("coefficient_friction");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property.coefficient_friction\" is not correct in FILE %s",path.toStdString().c_str());
-            coefficient_friction=coefficient_friction_v.toDouble();
+            coefficient_friction=value.toDouble();
             pro.coefficient_friction=coefficient_friction;
         }
 
@@ -666,9 +702,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
 
         BinaryVector<Decimal> angular_initial_target=pro.angular_initial_target;///angular_initial_target*
-        if(obj_json_root.contains("angular_initial_target"))
+        if(obj_property.contains("angular_initial_target"))
         {
-            QJsonValue angular_initial_target_v=obj_json_root.value("angular_initial_target");
+            QJsonValue angular_initial_target_v=obj_property.value("angular_initial_target");
             if(!angular_initial_target_v.isArray())
                 throw QString::asprintf("<ERROR> type of KEY \"property.angular_initial_target\" is not correct in FILE %s",path.toStdString().c_str());
 
@@ -688,9 +724,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         }
 
         BinaryVector<Decimal> angular_speed_max=pro.angular_speed_max;///angular_speed_max*
-        if(obj_json_root.contains("angular_speed_max"))
+        if(obj_property.contains("angular_speed_max"))
         {
-            QJsonValue angular_speed_max_v=obj_json_root.value("angular_speed_max");
+            QJsonValue angular_speed_max_v=obj_property.value("angular_speed_max");
             if(!angular_speed_max_v.isArray())
                 throw QString::asprintf("<ERROR> type of KEY \"property.angular_speed_max\" is not correct in FILE %s",path.toStdString().c_str());
 
@@ -709,14 +745,14 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
             pro.angular_speed_max=angular_speed_max;
         }
 
-        BinaryVector<Decimal> angular_acc_max=pro.angular_acc_max;///angular_acc_max*
-        if(obj_json_root.contains("angular_acc_max"))
+        ///angular_acc_max*
+        if(obj_property.contains("angular_acc_max"))
         {
-            QJsonValue angular_acc_max_v=obj_json_root.value("angular_acc_max");
-            if(!angular_acc_max_v.isArray())
+            QJsonValue value=obj_property.value("angular_acc_max");
+            if(!value.isArray())
                 throw QString::asprintf("<ERROR> type of KEY \"property.angular_acc_max\" is not correct in FILE %s",path.toStdString().c_str());
 
-            QJsonArray array= angular_acc_max_v.toArray();
+            QJsonArray array= value.toArray();
 
             if(array.size()!=2)
                 throw QString::asprintf("<ERROR> VALUE of KEY \"property.angular_acc_max\" is not correct in FILE %s",path.toStdString().c_str());
@@ -725,10 +761,8 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
             if(!(first.isDouble()&&second.isDouble()))
                 throw QString::asprintf("<ERROR> type of VALUE in KEY \"property.angular_acc_max\" is not correct in FILE %s",path.toStdString().c_str());
-            angular_acc_max.first=first.toDouble();
-            angular_acc_max.second=second.toDouble();
-
-            pro.angular_acc_max=angular_acc_max;
+            pro.angular_acc_max.first=first.toDouble();
+            pro.angular_acc_max.second=second.toDouble();
         }
 
 
@@ -736,9 +770,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
 
         QString mode_movement="";///mode_movement*
-        if(property.contains("mode_movement"))
+        if(obj_property.contains("mode_movement"))
         {
-            QJsonValue mode_movement_v = property.value("mode_movement");
+            QJsonValue mode_movement_v = obj_property.value("mode_movement");
             if(!mode_movement_v.isString())
                 throw QString::asprintf("<ERROR> type of KEY \"property.mode_movement\" is not correct in FILE %s",path.toStdString().c_str());
             mode_movement=mode_movement_v.toString();
@@ -746,9 +780,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         }
 
         QString mode_rotation="";///mode_rotation*
-        if(property.contains("mode_rotation"))
+        if(obj_property.contains("mode_rotation"))
         {
-            QJsonValue mode_rotation_v = property.value("mode_rotation");
+            QJsonValue mode_rotation_v = obj_property.value("mode_rotation");
             if(!mode_rotation_v.isString())
                 throw QString::asprintf("<ERROR> type of KEY \"property.mode_rotation\" is not correct in FILE %s",path.toStdString().c_str());
             mode_rotation=mode_rotation_v.toString();
@@ -759,9 +793,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         ///---------------------------------------------------------------------------布尔型
 
         bool flag_delete_outside_scene=pro.flag_delete_outside_scene;///flag_delete_outside_scene*
-        if(property.contains("flag_delete_outside_scene"))
+        if(obj_property.contains("flag_delete_outside_scene"))
         {
-            QJsonValue flag_delete_outside_scene_v = property.value("flag_delete_outside_scene");
+            QJsonValue flag_delete_outside_scene_v = obj_property.value("flag_delete_outside_scene");
             if(!flag_delete_outside_scene_v.isBool())
                 throw QString::asprintf("<ERROR> type of KEY \"property.flag_delete_outside_scene\" is not correct in FILE %s",path.toStdString().c_str());
             flag_delete_outside_scene=flag_delete_outside_scene_v.toBool();
@@ -769,9 +803,9 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         }
 
         bool flag_boundary_restriction=pro.flag_boundary_restriction;///flag_boundary_restriction*
-        if(property.contains("flag_boundary_restriction"))
+        if(obj_property.contains("flag_boundary_restriction"))
         {
-            QJsonValue flag_boundary_restriction_v = property.value("flag_boundary_restriction");
+            QJsonValue flag_boundary_restriction_v = obj_property.value("flag_boundary_restriction");
             if(!flag_boundary_restriction_v.isBool())
                 throw QString::asprintf("<ERROR> type of KEY \"property.flag_boundary_restriction\" is not correct in FILE %s",path.toStdString().c_str());
             flag_boundary_restriction=flag_boundary_restriction_v.toBool();
@@ -779,88 +813,100 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
         }
 
         bool flag_collision=pro.flag_collision;///flag_collision*
-        if(property.contains("flag_collision"))
+        if(obj_property.contains("flag_collision"))
         {
-            QJsonValue flag_collision_v = property.value("flag_collision");
+            QJsonValue flag_collision_v = obj_property.value("flag_collision");
             if(!flag_collision_v.isBool())
                 throw QString::asprintf("<ERROR> type of KEY \"property.flag_collision\" is not correct in FILE %s",path.toStdString().c_str());
             flag_collision=flag_collision_v.toBool();
             pro.flag_collision=flag_collision;
         }
 
-        bool flag_channel_collision=pro.flag_channel_collision;///flag_channel_collision*
-        if(property.contains("flag_channel_collision"))
+        ///flag_channel_collision*
+        if(obj_property.contains("flag_channel_collision"))
         {
-            QJsonValue flag_channel_collision_v = property.value("flag_channel_collision");
-            if(!flag_channel_collision_v.isBool())
+            QJsonValue value = obj_property.value("flag_channel_collision");
+            if(!value.isBool())
                 throw QString::asprintf("<ERROR> type of KEY \"property.flag_channel_collision\" is not correct in FILE %s",path.toStdString().c_str());
-            flag_channel_collision=flag_channel_collision_v.toBool();
-            pro.flag_channel_collision=flag_channel_collision;
+            pro.flag_channel_collision=value.toBool();
         }
 
-
+        ///flag_mutex*
+        if(obj_property.contains("flag_mutex"))
+        {
+            QJsonValue value = obj_property.value("flag_mutex");
+            if(!value.isBool())
+                throw QString::asprintf("<ERROR> type of KEY \"property.flag_mutex\" is not correct in FILE %s",path.toStdString().c_str());
+            pro.flag_mutex=value.toBool();
+        }
 
     }
 
     ///property_game
-    if(obj_json_root.contains("property_game"))
+    if(root.contains("property_game"))
     {
         //获取property对象
-        QJsonObject property_game = obj_json_root.value("property_game").toObject();
+        QJsonObject obj_property_game = root.value("property_game").toObject();
 
-        auto & pro_g = ref_obj_new.property_gaming;
+        auto & pro_g = obj_new.property_gaming;
 
 
         ///---------------------------------------------------------------------------数值型
 
-        Integer team=pro_g.team;///team*
-        if(property_game.contains("team"))
+        ///team*
+        if(obj_property_game.contains("team"))
         {
-            QJsonValue value = property_game.value("team");
+            QJsonValue value = obj_property_game.value("team");
             if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.team\" is not correct in FILE %s",path.toStdString().c_str());
-            team=value.toInt();
-            pro_g.team=team;
+            pro_g.team=value.toInt();
         }
 
-        Decimal damage=pro_g.damage;///damage*
-        if(property_game.contains("damage"))
+        ///score*
+        if(obj_property_game.contains("score"))
         {
-            QJsonValue lifetime_v = property_game.value("damage");
-            if(!lifetime_v.isDouble())
+            QJsonValue value = obj_property_game.value("team");
+            if(!value.isDouble())
+                throw QString::asprintf("<ERROR> type of KEY \"property_game.score\" is not correct in FILE %s",path.toStdString().c_str());
+            pro_g.score=value.toInt();
+        }
+
+
+        ///damage*
+        if(obj_property_game.contains("damage"))
+        {
+            QJsonValue value = obj_property_game.value("damage");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.damage\" is not correct in FILE %s",path.toStdString().c_str());
-            damage=lifetime_v.toInt();
-            pro_g.damage=damage;
+            pro_g.damage=value.toInt();
         }
 
-        Decimal resist=pro_g.resist;///resist*
-        if(property_game.contains("resist"))
+        ///resist*
+        if(obj_property_game.contains("resist"))
         {
-            QJsonValue resist_v = property_game.value("resist");
-            if(!resist_v.isDouble())
+            QJsonValue value = obj_property_game.value("resist");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.resist\" is not correct in FILE %s",path.toStdString().c_str());
-            resist=resist_v.toInt();
-            pro_g.resist=resist;
+            pro_g.resist=value.toInt();
         }
 
-        Decimal penetrability=pro_g.penetrability;///penetrability*
-        if(property_game.contains("penetrability"))
+        ///penetrability*
+        if(obj_property_game.contains("penetrability"))
         {
-            QJsonValue penetrability_v = property_game.value("penetrability");
-            if(!penetrability_v.isDouble())
+            QJsonValue value = obj_property_game.value("penetrability");
+            if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.penetrability\" is not correct in FILE %s",path.toStdString().c_str());
-            penetrability=penetrability_v.toInt();
-            pro_g.penetrability=penetrability;
+            pro_g.penetrability=value.toInt();
         }
 
 
         ///---------------------------------------------------------------------------数组型
 
 
-        BinaryVector<Decimal> endurance=pro_g.endurance;///endurance*
-        if(obj_json_root.contains("endurance"))
+        ///endurance*
+        if(root.contains("endurance"))
         {
-            QJsonValue endurance_v=obj_json_root.value("endurance");
+            QJsonValue endurance_v=root.value("endurance");
             if(!endurance_v.isArray())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.endurance\" is not correct in FILE %s",path.toStdString().c_str());
 
@@ -873,48 +919,247 @@ FlyingObject *Game::ResourcePackage::parse_json__object(const QString &path)
 
             if(!(first.isDouble()&&second.isDouble()))
                 throw QString::asprintf("<ERROR> type of VALUE in KEY \"property_game.endurance\" is not correct in FILE %s",path.toStdString().c_str());
-            endurance.first=first.toDouble();
-            endurance.second=second.toDouble();
-
-            pro_g.endurance=endurance;
+            pro_g.endurance.first=first.toDouble();
+            pro_g.endurance.second=second.toDouble();
         }
 
 
         ///---------------------------------------------------------------------------布尔型
 
-        bool flag_team_kill=pro_g.flag_team_kill;///flag_team_kill*
-        if(property_game.contains("flag_team_kill"))
+        ///flag_team_kill*
+        if(obj_property_game.contains("flag_team_kill"))
         {
-            QJsonValue flag_team_kill_v = property_game.value("flag_team_kill");
+            QJsonValue flag_team_kill_v = obj_property_game.value("flag_team_kill");
             if(!flag_team_kill_v.isBool())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.flag_team_kill\" is not correct in FILE %s",path.toStdString().c_str());
-            flag_team_kill=flag_team_kill_v.toBool();
-            pro_g.flag_team_kill=flag_team_kill;
+            pro_g.flag_team_kill=flag_team_kill_v.toBool();
         }
 
+    }
+
+    //容器中添加一个对象
+    objects[name]=obj_new;
+
+}
+
+void ResourcePackage::parse_json__derive_rule(const QString &path)
+{
+    QFile file;
+    file.setFileName(this->path_pkg+path);
+
+    //检查文件是否存在
+    if(!file.exists())
+        throw QString::asprintf("<ERROR> FILE %s not found",path.toStdString().c_str());
+
+    //打开文件(只读|文本)
+    file.open(QIODevice::ReadOnly | QIODevice::Text);
+    //读取所有内容
+    QString content = file.readAll();
+    //关闭文件
+    file.close();
+
+    QJsonParseError error_json;//解析错误
+    QJsonDocument doc_json;//json文档
+
+    doc_json=QJsonDocument::fromJson(content.toUtf8(),&error_json);
+
+    if(error_json.error!=QJsonParseError::NoError)
+        throw QString::asprintf("<ERROR> %s",error_json.errorString().toStdString().c_str());
+
+    QJsonObject root=doc_json.object();//获取根对象
 
 
+    ///---------------------------------------------------------------------------开始解析
+
+    DeriveRule rule_new;
+
+
+    Integer id = 0;///id
+    if(root.contains("id"))
+    {
+        QJsonValue value=root.value("id");
+        if(!value.isDouble())
+            throw QString::asprintf("<ERROR> type of KEY \"id\" is not correct in FILE %s",path.toStdString().c_str());
+        id=value.toInt();
+    }
+    else
+        throw QString::asprintf("<ERROR> KEY \"center\" not found in FILE %s",error_json.errorString().toStdString().c_str());
+
+    Integer period = 0;///period
+    if(root.contains("period"))
+    {
+        QJsonValue value=root.value("period");
+        if(!value.isDouble())
+            throw QString::asprintf("<ERROR> type of KEY \"period\" is not correct in FILE %s",path.toStdString().c_str());
+        period=value.toInt();
+        rule_new.period=period;
+    }
+    else
+        throw QString::asprintf("<ERROR> KEY \"period\" not found in FILE %s",error_json.errorString().toStdString().c_str());
+
+
+    ///units
+    if(root.contains("units"))
+    {
+        //获取property对象
+        QJsonArray array = root.value("units").toArray();
+
+        for(int i=0,size=array.size();i<size;++i)
+        {
+            DeriveUnit unit;
+
+            if(!array[i].isObject())
+                throw QString::asprintf("<ERROR> structure of KEY \"units\" is not correct in FILE %s",error_json.errorString().toStdString().c_str());
+
+            QJsonObject obj=array[i].toObject();
+
+            QString name;///object
+            if(obj.contains("object"))
+            {
+                QJsonValue value=obj.value("object");
+                if(!value.isString())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.object\" is not correct in FILE %s",path.toStdString().c_str());
+            }
+            else
+                throw QString::asprintf("<ERROR> KEY \"units.object\" not found in FILE %s",error_json.errorString().toStdString().c_str());
+
+            QString ref_direction;///ref_direction*
+            if(obj.contains("ref_direction"))
+            {
+                QJsonValue value=obj.value("ref_direction");
+                if(!value.isString())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.ref_direction\" is not correct in FILE %s",path.toStdString().c_str());
+                ref_direction=value.toString();
+                unit.ref_direction=ToolFunctionsKit::string_to_direction_reference(ref_direction);
+                if(unit.ref_direction==DR::None)
+                    throw QString::asprintf("<ERROR> value of KEY \"units.ref_direction\" is unknown in FILE %s",path.toStdString().c_str());
+            }
+
+
+            ///flag_inherit_speed*
+            if(obj.contains("flag_inherit_speed"))
+            {
+                QJsonValue value=obj.value("flag_inherit_speed");
+                if(!value.isBool())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.flag_inherit_speed\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.flag_inherit_speed=value.toBool();
+            }
+
+            ///flag_relative_position*
+            if(obj.contains("flag_relative_position"))
+            {
+                QJsonValue value=obj.value("flag_relative_position");
+                if(!value.isBool())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.flag_relative_position\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.flag_inherit_speed=value.toBool();
+            }
+
+
+            ///position*
+            if(root.contains("position"))
+            {
+                QJsonValue value=root.value("position");
+                if(!value.isArray())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.position\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonArray array= value.toArray();
+
+                if(array.size()!=2)
+                    throw QString::asprintf("<ERROR> VALUE of KEY \"units.position\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonValue first=array[0],second=array[1];
+
+                if(!(first.isDouble()&&second.isDouble()))
+                    throw QString::asprintf("<ERROR> type of VALUE in KEY \"units.position\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.position.first=first.toDouble();
+                unit.position.second=second.toDouble();
+            }
+
+            ///speed*
+            if(root.contains("speed"))
+            {
+                QJsonValue value=root.value("speed");
+                if(!value.isArray())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.speed\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonArray array= value.toArray();
+
+                if(array.size()!=2)
+                    throw QString::asprintf("<ERROR> VALUE of KEY \"units.speed\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonValue first=array[0],second=array[1];
+
+                if(!(first.isDouble()&&second.isDouble()))
+                    throw QString::asprintf("<ERROR> type of VALUE in KEY \"units.speed\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.speed.first=first.toDouble();
+                unit.speed.second=second.toDouble();
+            }
+
+            ///acceleration*
+            if(root.contains("acceleration"))
+            {
+                QJsonValue value=root.value("acceleration");
+                if(!value.isArray())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.acceleration\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonArray array= value.toArray();
+
+                if(array.size()!=2)
+                    throw QString::asprintf("<ERROR> VALUE of KEY \"units.acceleration\" is not correct in FILE %s",path.toStdString().c_str());
+
+                QJsonValue first=array[0],second=array[1];
+
+                if(!(first.isDouble()&&second.isDouble()))
+                    throw QString::asprintf("<ERROR> type of VALUE in KEY \"units.acceleration\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.acceleration.first=first.toDouble();
+                unit.acceleration.second=second.toDouble();
+            }
+
+
+            ///rotation*
+            if(root.contains("rotation"))
+            {
+                QJsonValue value=root.value("rotation");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.rotation\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.rotation=value.toDouble();
+            }
+
+            ///rotation_float*
+            if(root.contains("rotation_float"))
+            {
+                QJsonValue value=root.value("rotation_float");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.rotation_float\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.rotation_float=value.toDouble();
+            }
+
+            ///probability*
+            if(root.contains("probability"))
+            {
+                QJsonValue value=root.value("probability");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.probability\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.probability=value.toDouble();
+            }
+
+            //添加到末尾
+            rule_new.units<<(unit);
+        }
 
 
     }
 
-
+    this->rules_derive[id]=rule_new;//添加到容器中
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -923,6 +1168,434 @@ void Game::Scene::set_file_path(const QString &path)
     this->path_file=path;
 }
 
+void Scene::load()
+{
+    QFile file;
+    file.setFileName(this->path_file);
+
+    //检查文件是否存在
+    if(!file.exists())
+        throw QString::asprintf("<ERROR> FILE %s not found",file.fileName().toStdString().c_str());
+
+    //打开文件(只读|文本)
+    file.open(QIODevice::ReadOnly | QIODevice::Text);
+    //读取所有内容
+    QString content = file.readAll();
+    //关闭文件
+    file.close();
+
+    QJsonParseError error_json;//解析错误
+    QJsonDocument doc_json;//json文档
+
+    doc_json=QJsonDocument::fromJson(content.toUtf8(),&error_json);
+
+    if(error_json.error!=QJsonParseError::NoError)
+        throw QString::asprintf("<ERROR> %s",error_json.errorString().toStdString().c_str());
+
+    QJsonObject root=doc_json.object();//获取根对象
+
+    ///---------------------------------------------------------------------------开始解析
+
+    ///name*
+    if(root.contains("name"))
+    {
+        QJsonValue value=root.value("name");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"name\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->name=value.toString();
+    }
+
+    ///description*
+    if(root.contains("description"))
+    {
+        QJsonValue value=root.value("description");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"description\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->description=value.toString();
+    }
+
+    ///name_resource
+    if(root.contains("name_resource"))
+    {
+        QJsonValue value=root.value("name_resource");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"name_resource\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->name_resource=value.toString();
+    }
+
+    ///image_background
+    if(root.contains("image_internal"))
+    {
+        QJsonValue value=root.value("image_internal");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"image_internal\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->image_internal=value.toString();
+    }
+
+    ///image_background
+    if(root.contains("image_external"))
+    {
+        QJsonValue value=root.value("image_external");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"image_external\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->image_external=value.toString();
+    }
+
+    ///size
+    if(root.contains(QStringLiteral("size")))
+    {
+        QJsonValue center_v=root.value("size");
+        if(!center_v.isArray())
+            throw QString::asprintf("<ERROR> type of KEY \"size\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonArray array= center_v.toArray();
+
+        if(array.size()!=2)
+            throw QString::asprintf("<ERROR> VALUE of KEY \"size\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonValue first=array[0],second=array[1];
+
+        if(!(first.isDouble()&&second.isDouble()))
+            throw QString::asprintf("<ERROR> type of VALUE in KEY \"size\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->size.rx()=first.toInt();
+        this->size.ry()=second.toInt();
+    }
+    else
+        //非可选键未找到, 抛出异常
+        throw QString::asprintf("<ERROR> KEY \"size\" not found in FILE %s",path_file.toStdString().c_str());
+
+    ///pos_view*
+    if(root.contains(QStringLiteral("pos_view")))
+    {
+        QJsonValue center_v=root.value("pos_view");
+        if(!center_v.isArray())
+            throw QString::asprintf("<ERROR> type of KEY \"pos_view\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonArray array= center_v.toArray();
+
+        if(array.size()!=2)
+            throw QString::asprintf("<ERROR> VALUE of KEY \"pos_view\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonValue first=array[0],second=array[1];
+
+        if(!(first.isDouble()&&second.isDouble()))
+            throw QString::asprintf("<ERROR> type of VALUE in KEY \"pos_view\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->pos_view.rx()=first.toInt();
+        this->pos_view.ry()=second.toInt();
+    }
+
+    ///pos_initial*
+    if(root.contains(QStringLiteral("pos_initial")))
+    {
+        QJsonValue center_v=root.value("pos_initial");
+        if(!center_v.isArray())
+            throw QString::asprintf("<ERROR> type of KEY \"pos_initial\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonArray array= center_v.toArray();
+
+        if(array.size()!=2)
+            throw QString::asprintf("<ERROR> VALUE of KEY \"pos_initial\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+        QJsonValue first=array[0],second=array[1];
+
+        if(!(first.isDouble()&&second.isDouble()))
+            throw QString::asprintf("<ERROR> type of VALUE in KEY \"pos_initial\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->pos_initial.rx()=first.toDouble();
+        this->pos_initial.ry()=second.toDouble();
+    }
+
+
+    ///rules_generate
+    if(root.contains("rules_generate"))
+    {
+        //获取property对象
+        QJsonArray array = root.value("rules_generate").toArray();
+
+        for(int i=0;i<array.size();++i)
+        {
+            QJsonObject obj=array[i].toObject();
+
+            std::pair<SceneGenerateRule,ObjectActionProperty> pair;
+
+            if(obj.contains("rule"))
+            {
+                QJsonObject obj_rule=obj.value("rule").toObject();
+
+                ///flag_in_viewport*
+                if(obj_rule.contains("flag_in_viewport"))
+                {
+                    QJsonValue value = obj_rule.value("flag_in_viewport");
+                    if(!value.isBool())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.flag_in_viewport\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.flag_in_viewport=value.toBool();
+                }
+
+                ///position*
+                if(obj_rule.contains(QStringLiteral("position")))
+                {
+                    QJsonValue center_v=obj_rule.value("position");
+                    if(!center_v.isArray())
+                        throw QString::asprintf("<ERROR> type of KEY \"rules_generate.action.position\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonArray array= center_v.toArray();
+
+                    if(array.size()!=2)
+                        throw QString::asprintf("<ERROR> VALUE of KEY \"rules_generate.action.position\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonValue first=array[0],second=array[1];
+
+                    if(!(first.isDouble()&&second.isDouble()))
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.position\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.position.rx()=first.toDouble();
+                    pair.first.position.ry()=second.toDouble();
+                }
+
+                ///requirement_time*
+                if(obj_rule.contains("requirement_time"))
+                {
+                    QJsonValue value = obj_rule.value("requirement_time");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.requirement_time\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.requirement_time=value.toInt();
+                }
+
+                ///requirement_score*
+                if(obj_rule.contains("requirement_score"))
+                {
+                    QJsonValue value = obj_rule.value("requirement_score");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.requirement_score\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.requirement_score=value.toInt();
+                }
+
+                ///number
+                if(obj_rule.contains("number"))
+                {
+                    QJsonValue value = obj_rule.value("number");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.number\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.number=value.toInt();
+                }
+
+                ///name_object
+                if(obj_rule.contains("name_object"))
+                {
+                    QJsonValue value = obj_rule.value("name_object");
+                    if(!value.isString())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.name_object\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.name_object=value.toString();
+                }
+                else
+                    //非可选键未找到, 抛出异常
+                    throw QString::asprintf("<ERROR> KEY \"rules_generate.rule.name_object\" not found in FILE %s",path_file.toStdString().c_str());
+
+                ///number
+                if(obj_rule.contains("rotation"))
+                {
+                    QJsonValue value = obj_rule.value("rotation");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.rule.rotation\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.first.rotation=value.toDouble();
+                }
+            }
+
+            if(obj.contains("action"))
+            {
+                QJsonObject obj_action=obj.value("action").toObject();
+
+
+                ///flag_player_manip*
+                if(obj_action.contains("flag_player_manip"))
+                {
+                    QJsonValue value = obj_action.value("flag_player_manip");
+                    if(!value.isBool())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.flag_player_manip\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.flag_player_manip=value.toBool();
+                }
+
+                ///flag_auto_target*
+                if(obj_action.contains("flag_auto_target"))
+                {
+                    QJsonValue value = obj_action.value("flag_auto_target");
+                    if(!value.isBool())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.flag_auto_target\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.flag_auto_target=value.toBool();
+                }
+
+                ///flag_anticipation*
+                if(obj_action.contains("flag_anticipation"))
+                {
+                    QJsonValue value = obj_action.value("flag_anticipation");
+                    if(!value.isBool())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.flag_anticipation\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.flag_anticipation=value.toBool();
+                }
+
+                ///frequency_dodge*
+                if(obj_action.contains("frequency_dodge"))
+                {
+                    QJsonValue value = obj_action.value("frequency_dodge");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.frequency_dodge\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.frequency_dodge=value.toDouble();
+                }
+
+                ///period_dodge*
+                if(obj_action.contains("period_dodge"))
+                {
+                    QJsonValue value = obj_action.value("period_dodge");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.period_dodge\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.cooldown_dodge.second=value.toInt();
+                }
+
+
+                ///rotate_idle*
+                if(obj_action.contains(QStringLiteral("rotate_idle")))
+                {
+                    QJsonValue center_v=obj_action.value("rotate_idle");
+                    if(!center_v.isArray())
+                        throw QString::asprintf("<ERROR> type of KEY \"rules_generate.action.rotate_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonArray array= center_v.toArray();
+
+                    if(array.size()!=2)
+                        throw QString::asprintf("<ERROR> VALUE of KEY \"rules_generate.action.rotate_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonValue first=array[0],second=array[1];
+
+                    if(!(first.isDouble()&&second.isDouble()))
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.rotate_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.rotate_idle.first=first.toDouble();
+                    pair.second.rotate_idle.second=second.toInt();
+                }
+
+                ///move_idle*
+                if(obj_action.contains(QStringLiteral("move_idle")))
+                {
+                    QJsonValue center_v=obj_action.value("move_idle");
+                    if(!center_v.isArray())
+                        throw QString::asprintf("<ERROR> type of KEY \"rules_generate.action.move_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonArray array= center_v.toArray();
+
+                    if(array.size()!=2)
+                        throw QString::asprintf("<ERROR> VALUE of KEY \"rules_generate.action.move_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+
+                    QJsonValue first=array[0],second=array[1];
+
+                    if(!(first.isDouble()&&second.isDouble()))
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.move_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.move_idle.first=first.toDouble();
+                    pair.second.move_idle.second=second.toInt();
+                }
+
+
+                ///period_idle*
+                if(obj_action.contains("period_idle"))
+                {
+                    QJsonValue value = obj_action.value("period_idle");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.period_idle\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.cooldown_idle.second=value.toInt();
+                }
+
+                ///perception*
+                if(obj_action.contains("perception"))
+                {
+                    QJsonValue value = obj_action.value("perception");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.perception\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.perception=value.toDouble();
+                }
+
+                ///frequency_attack*
+                if(obj_action.contains("frequency_attack"))
+                {
+                    QJsonValue value = obj_action.value("frequency_attack");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.frequency_attack\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.frequency_attack=value.toDouble();
+                }
+
+                ///period_attack*
+                if(obj_action.contains("period_attack"))
+                {
+                    QJsonValue value = obj_action.value("period_attack");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.period_attack\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.cooldown_attack.second=value.toInt();
+                }
+
+
+                ///number_rest_attack*
+                if(obj_action.contains("number_rest_attack"))
+                {
+                    QJsonValue value = obj_action.value("number_rest_attack");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.number_rest_attack\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.number_rest_attack=value.toInt();
+                }
+
+                ///duration_attack*
+                if(obj_action.contains("duration_attack"))
+                {
+                    QJsonValue value = obj_action.value("duration_attack");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.duration_attack\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.duration_attack=value.toInt();
+                }
+
+                ///float_duration_attack*
+                if(obj_action.contains("float_duration_attack"))
+                {
+                    QJsonValue value = obj_action.value("float_duration_attack");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.float_duration_attack\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.float_duration_attack=value.toDouble();
+                }
+
+                ///damage_rate*
+                if(obj_action.contains("damage_rate"))
+                {
+                    QJsonValue value = obj_action.value("damage_rate");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.damage_rate\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.damage_rate=value.toDouble();
+                }
+
+                ///resist_rate*
+                if(obj_action.contains("resist_rate"))
+                {
+                    QJsonValue value = obj_action.value("resist_rate");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.resist_rate\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.resist_rate=value.toDouble();
+                }
+
+                ///penetrability_rate*
+                if(obj_action.contains("penetrability_rate"))
+                {
+                    QJsonValue value = obj_action.value("penetrability_rate");
+                    if(!value.isDouble())
+                        throw QString::asprintf("<ERROR> type of VALUE in KEY \"rules_generate.action.penetrability_rate\" is not correct in FILE %s",path_file.toStdString().c_str());
+                    pair.second.resist_rate=value.toDouble();
+                }
+
+            }
+
+            this->rules_generate.emplace_back(pair);//添加到容器中
+        }
+    }
+    else
+        //非可选键未找到, 抛出异常
+        throw QString::asprintf("<ERROR> KEY \"rules_generate\" not found in FILE %s",path_file.toStdString().c_str());
+}
+
+void Scene::clear()
+{
+    new (this)Scene();//调用默认构造函数重新构造
+}
 
 
 

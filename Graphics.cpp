@@ -4,7 +4,8 @@
 void GraphicsView::mouseMoveEvent(QMouseEvent *event)
 {
     event->ignore();
-    pos_mouse=event->pos();
+    pos_mouse=this->mapToScene(event->pos());
+//    qDebug()<<pos_mouse;
 }
 
 void GraphicsView::mousePressEvent(QMouseEvent *event)
@@ -24,28 +25,36 @@ void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
 void GraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
     static int count;
-    painter->setBrush(QBrush(QColor(0xff,0xff,0xff)));
-    painter->drawRect(rect);
-//    using namespace Core;
+    const auto& rect_scene=this->sceneRect();
 
-//    static int t=0;
+    if(rect_scene.contains(rect))//包含
+    {
+        painter->setBrush(brush_internal);
+        painter->drawRect(rect);
+    }
+    else
+    {
+        QRectF intersection=rect_scene.intersected(rect);//获取交集部分
 
+        painter->setBrush(brush_external);
+        painter->drawRect(rect);
 
-//    if(t==0)
-//    {
-//        Decimal rand=ToolFunctions::get_random_decimal_0_1();//获取一个随机数,用于处理颜色
+        painter->setBrush(brush_internal);
+        painter->drawRect(intersection);
 
-//        int value = 180+50*rand;//获得区间范围内的值
-
-//        painter->setBrush(QBrush(QColor(value,value,value)));
-//        painter->drawRect(rect);
-
-
-
-//        t=100;
-//    }
-
-//    --t;
+    }
+    QBrush brush;
+    brush.setColor(QColor(0xcc,0xcc,0xcc));
+    painter->drawRect(rect_scene);
 
 
 }
+
+
+
+
+
+
+
+
+

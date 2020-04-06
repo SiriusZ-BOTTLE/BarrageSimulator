@@ -54,7 +54,7 @@ void init_inner_data()
         {
             {
                 objects_inner+IOS::Bullet_type0_blue,
-                DR::RelativeToParentRotation,
+                DR::RelativeToParentDirection,
                 false,//不继承父对象速度
                 true,//相对位置
                 {0,-50},//初始位置
@@ -75,7 +75,6 @@ void init_inner_data()
 //                0.02//角度浮动
 //            }
         }
-
     };
 
 
@@ -108,7 +107,7 @@ void init_block_zero_blue()
     tmp.property.offset_front=90;//正面偏移量
     tmp.property.angular_speed_max.second=10;//最大角速度
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
-    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
+//    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
     tmp.property_gaming.team=InnerTeam::PlayerTeam;//队伍
     tmp.property_gaming.damage=5;//碰撞伤害
@@ -133,7 +132,7 @@ void init_bullet_type0_blue()
     tmp.property.channel_collision=PlayerManipulation;//player操纵
     tmp.property.flag_channel_collision=false;//同频道碰撞
     tmp.property.number_rest_collision=2;//碰撞次数
-    tmp.property.mass=3;//质量
+    tmp.property.mass=5;//质量
     tmp.property.lifetime=200;
     tmp.property.flag_boundary_restriction=false;//边界限制关闭
     tmp.property.flag_delete_outside_scene=false;
@@ -142,7 +141,7 @@ void init_bullet_type0_blue()
     tmp.property.acceleration_max=0;//最大加速度
     tmp.property.mode_movement=MovementMode::Unlimited;//无限制(根据按键设置)
     tmp.property.mode_rotation=RotationMode::FollowSpeed;//跟随速度方向
-    tmp.property.offset_front=-90;//正面角度偏移量
+    tmp.property.offset_front=90;//正面角度偏移量
 
 //    tmp.property_gaming.index_bullet_series=0;//0系列
 //    tmp.property_gaming.index_bullet_level=0;//等级0
@@ -179,7 +178,7 @@ void init_block_zero_red()
     tmp.property.offset_front=90;//正面偏移量
     tmp.property.angular_speed_max.second=10;//最大角速度
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
-    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
+//    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
     tmp.property_gaming.team=InnerTeam::ComputerTeam;//队伍
     tmp.property_gaming.damage=5;//碰撞伤害
