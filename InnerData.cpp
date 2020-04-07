@@ -52,17 +52,17 @@ void init_inner_data()
     {
         15,//十个数据更新周期可以生成执行一次生成操作
         {
-            {
-                objects_inner+IOS::Bullet_type0_blue,
-                DR::RelativeToParentDirection,
-                false,//不继承父对象速度
-                true,//相对位置
-                {0,-50},//初始位置
-                {0,-1},//初始速度
-                {0,-1},//初始加速度
-                0,//初始角度
-                0.02//角度浮动
-            },
+//            {
+//                objects_inner+IOS::Bullet_type0_blue,
+//                DR::RelativeToParentDirection,
+//                false,//不继承父对象速度
+//                true,//相对位置
+//                {0,-50},//初始位置
+//                {0,-1},//初始速度
+//                {0,-1},//初始加速度
+//                0,//初始角度
+//                0.02//角度浮动
+//            },
 //            {
 //                objects_inner+IOS::Bullet_type0_blue,
 //                DR::RelativeToParentRotation,

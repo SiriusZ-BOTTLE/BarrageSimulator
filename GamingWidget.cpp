@@ -294,8 +294,10 @@ void ObjectsControl::process_data()
                     pro_g_crt.endurance.first-=pro_g_ano.damage*pro_g_ano.penetrability/pro_g_crt.resist;
                     pro_g_ano.endurance.first-=pro_g_crt.damage*pro_g_crt.penetrability/pro_g_ano.resist;
                     //穿过物体也算作发生碰撞
-                    --p_crt->property.number_rest_collision;
-                    --p_another->property.number_rest_collision;
+                    if(p_crt->property.number_rest_collision>0)
+                        --p_crt->property.number_rest_collision;
+                    if(p_another->property.number_rest_collision>0)
+                        --p_another->property.number_rest_collision;
                 }
             }
 
@@ -470,7 +472,7 @@ void ObjectsControl::process_data()
     auto end = std::chrono::steady_clock::now();
     auto time_total = std::chrono::duration_cast<std::chrono::microseconds>(start-end).count();
 
-    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
+//    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
     ///AI控制
 }
 
@@ -513,12 +515,19 @@ void ObjectsControl::manage_objects()
 
         if(flag_destroy)//销毁对象
         {
+
             data_runtime.score+=p_crt->property_gaming.score;//计算分数
             //销毁对象
             data_runtime.list_objects.removeAt(index); //删除元素
             if(pro.rule_on_destroy)
                 derive_object(pro, data_runtime.pkg.rules_derive[pro.rule_on_destroy]); //使用销毁规则进行派生(亡语)
             p_crt->remove_from_scene();//从场景中删除对象
+            if(p_crt==data_runtime.p1)//玩家控制对象
+            {
+                emit signal_game_over();//发送信号
+                continue;//跳过
+            }
+
             delete p_crt->item;                         //释放场景元素
             delete p_crt;                               //释放管理对象
             --index;
@@ -552,11 +561,11 @@ void ObjectsControl::manage_objects()
     ///场景生成
     Integer size=static_cast<Integer>(data_runtime.scene.rules_generate.size());
 
-    if(size==data_runtime.index_crt_generate_rule)
-        return;
-
     if(cooldown>0)
         --cooldown;
+
+    if(size==data_runtime.index_crt_generate_rule)
+        return;
 
     if(cooldown==0)
     {
@@ -567,15 +576,16 @@ void ObjectsControl::manage_objects()
 
             if(size>data_runtime.index_crt_generate_rule)
                 unit=&data_runtime.scene.rules_generate[static_cast<size_t>(data_runtime.index_crt_generate_rule)];
-            rest=unit->first.number-1;
+            rest=unit->first.number;
         }
         else
             --rest;
         //获取当前规则的引用
 
+        if(data_runtime.score<unit->first.requirement_score)
+            return;
 
-        if(rest!=0||(data_runtime.num_updates>=unit->first.requirement_time
-                &&data_runtime.score>=unit->first.requirement_score))
+        if(rest!=0||(data_runtime.num_updates>=unit->first.requirement_time))
         {
             generate_object(unit->first,unit->second);//生成对象
             cooldown=unit->first.interval;//设置冷却
@@ -621,11 +631,11 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
 
         obj_new = new FlyingObject(*(unit.object)); //申请新对象
 
-        ///处理旋转方向
-        Decimal range_rotation_float = 360 * unit.rotation_float;                                            //获取浮动总范围
-        Decimal offset_rotation = (ToolFunctionsKit::get_random_decimal_0_1() - 0.5) * range_rotation_float; //获取浮动值
-        obj_new->property.rotation.first = offset_rotation;
+        obj_new->property.lifetime*=1 + (ToolFunctionsKit::get_random_decimal_0_1() - 0.5)*unit.float_lifetime*2;
 
+        ///处理方向
+
+        //方向参照
         switch (unit.ref_direction)
         {
         case DR::RelativeToParentDirection: //相对基对象
@@ -646,8 +656,10 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
         case DR::Absolute: //绝对方向
             break;
         }
+        //方向浮动
+        obj_new->property.rotation.first+=(ToolFunctionsKit::get_random_decimal_0_1() - 0.5) * 360 * unit.float_direction;
 
-        BinaryVector<Decimal> bv_tmp{}; //临时速度变量(极坐标)
+        BinaryVector<Decimal> bv_tmp{}; //临时变量(极坐标)
 
         ///处理坐标
 
@@ -663,13 +675,41 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
             obj_new->property.coordinate.second += pro.coordinate.second;
         }
 
+
         ///处理速度
 
-        bv_tmp = unit.speed;
-        if (unit.speed.second < 0)                         //如果速度大小为负
+        bv_tmp = unit.speed;//获取规则指定的速度
+        //速度方向参照
+        switch (unit.ref_speed_direction)
+        {
+        case DR::RelativeToParentDirection: //相对基对象
+        {
+            bv_tmp.first = pro.rotation.first - pro.offset_front;
+            break;
+        }
+        case DR::RelativeToParentSpeed: //相对基对象速度
+        {
+            bv_tmp.first += pro.speed_polar.first * R2D;
+            break;
+        }
+        case DR::RelativeToParentAcc: //相对基对象加速度
+        {
+            bv_tmp.first += pro.acceleration_polar.first * R2D;
+            break;
+        }
+        case DR::Absolute: //绝对方向
+            break;
+        }
+
+        if (unit.speed.second < 0)                              //如果速度大小为负
             bv_tmp.second = unit.object->property.velocity_max; //使用最大速率
-        //速度方向修正(以派生对象当前方向为参照)
-        bv_tmp.first = bv_tmp.first + obj_new->property.rotation.first * D2R;
+
+        //速度方向浮动
+        bv_tmp.first+=(ToolFunctionsKit::get_random_decimal_0_1() - 0.5) * 360 * unit.float_direction_speed;
+        bv_tmp.first*=D2R;//转弧度
+        //速度大小浮动
+        bv_tmp.second*=1 + (ToolFunctionsKit::get_random_decimal_0_1() - 0.5)*unit.float_magnitude_speed*2;
+
         ToolFunctionsKit::polar_to_axis(bv_tmp, obj_new->property.speed_axis); //转为轴坐标
 
         if (unit.flag_inherit_speed) //速度继承
@@ -681,12 +721,38 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
         //根据轴坐标转换为极坐标
         ToolFunctionsKit::axis_to_polar(obj_new->property.speed_axis, obj_new->property.speed_polar);
 
+
         ///处理加速度
         bv_tmp = unit.acceleration;
+        //加速度方向参照
+        switch (unit.ref_speed_direction)
+        {
+        case DR::RelativeToParentDirection: //相对基对象
+        {
+            bv_tmp.first = pro.rotation.first - pro.offset_front;
+            break;
+        }
+        case DR::RelativeToParentSpeed: //相对基对象速度
+        {
+            bv_tmp.first += pro.speed_polar.first * R2D;
+            break;
+        }
+        case DR::RelativeToParentAcc: //相对基对象加速度
+        {
+            bv_tmp.first += pro.acceleration_polar.first * R2D;
+            break;
+        }
+        case DR::Absolute: //绝对方向
+            break;
+        }
         if (unit.acceleration.second < 0)                      //如果速度大小为负
             bv_tmp.second = unit.object->property.acceleration_max; //使用最大加速度
-        //速度方向修正(以派生对象当前方向为参照)
-        bv_tmp.first = bv_tmp.first + obj_new->property.rotation.first * D2R;
+        //加速度方向浮动
+        bv_tmp.first+=(ToolFunctionsKit::get_random_decimal_0_1() - 0.5) * 360 * unit.float_direction_acc;
+        bv_tmp.first*=D2R;//转弧度
+        //加速度大小浮动
+        bv_tmp.second*=1 + (ToolFunctionsKit::get_random_decimal_0_1() + 0.5)*unit.float_magnitude_acc*2;
+
         ToolFunctionsKit::polar_to_axis(bv_tmp, obj_new->property.acceleration_axis); //转为轴坐标
 
         //根据轴坐标转换为极坐标
@@ -815,6 +881,8 @@ void GameWidget::init_components()
     widget_log=new QWidget();
     widget_menu = new QWidget();
     panel_log=new QWidget();
+    widget_game_info=new QWidget();
+    panel_game_over=new QWidget();
 
     layout_widget_menu = new QGridLayout();
     layout_title=new QGridLayout();
@@ -823,7 +891,7 @@ void GameWidget::init_components()
     layout_panel_title=new QGridLayout();
     layout_panel_start=new QGridLayout();
     layout_panel_log=new QGridLayout();
-
+    layout_widget_game_info=new QGridLayout();
 
     button_start=new Button("START");
     button_load=new Button("LOAD");
@@ -843,6 +911,8 @@ void GameWidget::init_components()
     label_bottom_info_title=new QLabel();
     label_start_page_top=new QLabel();
     label_info_page_top=new QLabel();
+    label_game_info=new QLabel();
+    label_game_over=new QLabel();
 
     browser_info=new QTextBrowser();
 }
@@ -856,6 +926,8 @@ void GameWidget::init_UI()
         "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; }"
         //暂停菜单
         "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
+        "QWidget#widget_game_info { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
+        "QWidget#widget_game_info > QLabel { font-size: 30px; background-color: rgba(0,0,0,0.9); }"
         //面板
         "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
         //按钮
@@ -1010,10 +1082,9 @@ void GameWidget::init_UI()
     //主界面设置
 
 
-    ///暂停页
+    ///menu页
     widget_menu->setLayout(layout_widget_menu);
 
-    layout_widget_menu->setSpacing(10);
     layout_widget_menu->addWidget(label_info_esc_menu, 0, 0, Qt::AlignTop | Qt::AlignLeft);
     layout_widget_menu->setRowStretch(1, 10);
     layout_widget_menu->addWidget(button_resume_pause_menu, 2, 0, Qt::AlignLeft);
@@ -1027,6 +1098,27 @@ void GameWidget::init_UI()
     widget_menu->setVisible(false); //不可见
     widget_menu->raise();           //置于顶层
     widget_menu->setObjectName("widget_menu");
+
+    ///game_info页
+    widget_game_info->setLayout(layout_widget_game_info);
+
+    layout_widget_game_info->setSpacing(0);
+
+
+    layout_widget_game_info->addWidget(label_game_info,0,0,Qt::AlignLeft);
+    layout_widget_game_info->addWidget(panel_game_over,2,0,1,4,Qt::AlignCenter);
+    layout_widget_game_info->setRowStretch(0,0);
+    layout_widget_game_info->setRowStretch(1,1);
+    layout_widget_game_info->setRowStretch(2,1);
+    layout_widget_game_info->setRowStretch(3,1);
+
+    panel_game_over->setVisible(false);//不可见
+    widget_game_info->setAttribute(Qt::WA_TransparentForMouseEvents,true);//不响应鼠标
+
+    widget_game_info->setVisible(false);
+    widget_game_info->setParent(this);
+    widget_game_info->raise();
+    widget_game_info->setObjectName("widget_game_info");
 
 
     //各种组件的尺寸初始设置
@@ -1061,6 +1153,8 @@ void GameWidget::init_signal_slots()
     connect(button_play_start, &QPushButton::clicked,this,&GameWidget::load_scene);
 
     connect(button_exit_pause_menu, &QPushButton::clicked,this,&GameWidget::exit);
+
+    connect(&control, &ObjectsControl::signal_game_over,this,&GameWidget::game_over);
 }
 
 void GameWidget::init_threads()
@@ -1301,6 +1395,7 @@ void GameWidget::load_scene()
         this->timer_title.stop();//关闭主界面
         this->status=Status::Running;
         this->timer.start(Settings::interval);
+        this->widget_game_info->setVisible(true);
     }
     catch (const QString &e)
     {
@@ -1348,8 +1443,8 @@ void GameWidget::initialize()
 
 void GameWidget::reset()
 {
-    qDebug()<<"reset()";
     this->status=Status::Over;
+    this->widget_game_info->setVisible(false);
     timer.stop();//结束定时器
     timer_title.start();
     this->view_title->setVisible(true);
@@ -1436,7 +1531,8 @@ void GameWidget::update()
     if (cooldown_next_data_update == 0)
     {
 //        emit signal_process_data(); //发送信号, 子线程处理数据
-
+        if(this->mouse_event_not_handled)
+            mouse_event_not_handled=false;
         try
         {
             control.process_data();    //数据处理
@@ -1456,6 +1552,13 @@ void GameWidget::update()
         if(data_runtime.p1->item)
             data_runtime.view_main->centerOn(data_runtime.p1->item);//保持中心
 
+        this->label_game_info->setText(
+        QString::asprintf(
+                        "HP: %3.0f / %-5.0f   \nScore: %-5lld",
+                        data_runtime.p1->property_gaming.endurance.first,
+                        data_runtime.p1->property_gaming.endurance.second,
+                        data_runtime.score
+                        ));
     }
     key_process(); //按键处理
 
@@ -1606,6 +1709,11 @@ void GameWidget::exit()
 
 }
 
+void GameWidget::game_over()
+{
+
+}
+
 
 void GameWidget::keyPressEvent(QKeyEvent *event)
 {
@@ -1632,7 +1740,6 @@ void GameWidget::keyReleaseEvent(QKeyEvent *event)
         {
             //设置对应键位释放状态
             data_runtime.status_keys[Settings::map_keys[code_key]] = false;
-            //            key_process(); //按键处理
         }
     }
 }
@@ -1644,7 +1751,8 @@ void GameWidget::mousePressEvent(QMouseEvent *event)
     if (event->buttons() & Qt::LeftButton)
     {
         data_runtime.status_keys[Key::ML] = true;
-        mouse_delay = 7;
+//        mouse_delay = 7;
+        mouse_event_not_handled=true;
     }
     if (event->buttons() & Qt::RightButton)
     {
@@ -1658,7 +1766,8 @@ void GameWidget::mouseReleaseEvent(QMouseEvent *event)
         return;
     if (!event->buttons() & Qt::LeftButton)
     {
-        data_runtime.status_keys[Key::ML] = false;
+        if(!mouse_event_not_handled)
+            data_runtime.status_keys[Key::ML] = false;
     }
     if (!event->buttons() & Qt::RightButton)
     {
@@ -1670,6 +1779,7 @@ void GameWidget::resizeEvent(QResizeEvent *event)
 {
     this->view_title->resize(event->size());
     this->widget_menu->resize(event->size());
+    this->widget_game_info->resize(event->size());
 
 //    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width()-1,data_runtime.view_main->height()-1);
     view_title->setSceneRect(-view_title->width()/2,-view_title->height()/2,view_title->width(),view_title->height());

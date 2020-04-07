@@ -316,8 +316,15 @@ namespace Core
         Decimal speed_float{0.0};//速度大小浮动百分比
         BinaryVector<Decimal> acceleration{0,0};//初始加速度(极坐标, 若大小小于0, 则使用最大加速度)
         Decimal acc_float{0.0};//加速度大小浮动百分比
-        Decimal rotation{0.0};//初始角度
-        Decimal rotation_float{0.0};//总体方向浮动百分比(确定了方向之后进行浮动, 这里"方向", "速度方向", "加速度方向是分开的")
+        Decimal direction{0.0};//方向
+        Decimal direction_speed{0.0};//速度方向
+        Decimal direction_acc{0.0};//加速度方向
+        Decimal float_direction{0.0};//方向浮动百分比(确定了方向之后进行浮动)
+        Decimal float_direction_speed{0.0};//速度方向浮动百分比(确定了方向之后进行浮动)
+        Decimal float_direction_acc{0.0};//加速度方向浮动百分比(确定了方向之后进行浮动)
+        Decimal float_magnitude_speed{0.0};//速度大小浮动百分比
+        Decimal float_magnitude_acc{0.0};//加速度大小浮动百分比
+        Decimal float_lifetime{0.0};//生命周期浮动
         Decimal probability{1.0};//派生概率[0.0,1.0]
     };
 

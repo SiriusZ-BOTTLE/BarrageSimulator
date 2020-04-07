@@ -69,6 +69,7 @@ private:
 signals:
     void updated();//更新信号
     void signal_push_info(const QString &info);
+    void signal_game_over();//游戏结束(暂时不使用)
 
 };
 
@@ -111,6 +112,9 @@ public:
     QWidget * panel_start{nullptr};//start页面板
     QWidget * panel_title{nullptr};//title页面板
 
+    QWidget * widget_game_info{nullptr};//游戏信息覆盖面板
+    QWidget * panel_game_over{nullptr};//游戏结束面板
+
     ///标签
     QLabel * label_overlay{nullptr};//覆盖信息显示层
     QLabel * label_info_esc_menu{nullptr};
@@ -118,6 +122,8 @@ public:
     QLabel * label_bottom_info_title{nullptr};//标题页底部信息
     QLabel * label_start_page_top{nullptr};//start页顶部标签
     QLabel * label_info_page_top{nullptr};//信息显示页顶部标签
+    QLabel * label_game_info{nullptr};//游戏信息
+    QLabel * label_game_over{nullptr};//游戏结束标签
 
     QTextBrowser * browser_info{nullptr};//信息浏览器
 
@@ -137,6 +143,7 @@ public:
     QGridLayout * layout_panel_title{nullptr};//标题页面板布局
     QGridLayout * layout_panel_start{nullptr};//start页面板布局
     QGridLayout * layout_panel_log{nullptr};//信息页面板布局
+    QGridLayout * layout_widget_game_info{nullptr};//
 
     ///标题页按钮
     Button * button_start{nullptr};//start
@@ -189,6 +196,8 @@ public:
 
     int mouse_delay{0};//鼠标延迟
 
+    bool mouse_event_not_handled;//未处理鼠标事件
+
 public:
 
 public:
@@ -235,7 +244,6 @@ public:
     void initialize();
     //全部重置
     void reset();
-
     //启动
     void start();
 
@@ -265,6 +273,8 @@ public slots:
     void close_log_page();//关闭log页
 
     void exit();//暂停菜单exit按钮
+
+    void game_over();//游戏结束
 
 
 protected:

@@ -38,8 +38,8 @@
         "team":2,
         "score":10,
         "endurance":[100,100],
-        "damage":5,
+        "damage":10,
         "resist":10,
-        "penetrability":0
+        "penetrability":5
     }
 }

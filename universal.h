@@ -5,7 +5,7 @@
 
 #include "Button.h"
 #include "Graphics.h"
-#include "InnerData.h"
+//#include "InnerData.h"//废弃头文件
 
 #include "Core.h"
 

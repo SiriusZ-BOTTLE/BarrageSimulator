@@ -5,7 +5,7 @@
 
 #define EC2I(enumclassitem) static_cast<int>(enumclassitem)
 
-///程序内置数据(仅测试用)
+///程序内置数据(仅测试用, 现在已经被废弃)
 
 namespace InnerData
 {

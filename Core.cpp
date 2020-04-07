@@ -899,7 +899,7 @@ void Game::ResourcePackage::parse_json__object(const QString &path)
         ///score*
         if(obj_property_game.contains("score"))
         {
-            QJsonValue value = obj_property_game.value("team");
+            QJsonValue value = obj_property_game.value("score");
             if(!value.isDouble())
                 throw QString::asprintf("<ERROR> type of KEY \"property_game.score\" is not correct in FILE %s",path.toStdString().c_str());
             pro_g.score=value.toInt();
@@ -1184,24 +1184,88 @@ void ResourcePackage::parse_json__derive_rule(const QString &path)
             }
 
 
-            ///rotation*
-            if(obj.contains("rotation"))
+            ///direction*
+            if(obj.contains("direction"))
             {
-                QJsonValue value=obj.value("rotation");
+                QJsonValue value=obj.value("direction");
                 if(!value.isDouble())
-                    throw QString::asprintf("<ERROR> type of KEY \"units.rotation\" is not correct in FILE %s",path.toStdString().c_str());
+                    throw QString::asprintf("<ERROR> type of KEY \"units.direction\" is not correct in FILE %s",path.toStdString().c_str());
 
-                unit.rotation=value.toDouble();
+                unit.direction=value.toDouble();
             }
 
-            ///rotation_float*
-            if(obj.contains("rotation_float"))
+            ///direction_speed*
+            if(obj.contains("direction_speed"))
             {
-                QJsonValue value=obj.value("rotation_float");
+                QJsonValue value=obj.value("direction_speed");
                 if(!value.isDouble())
-                    throw QString::asprintf("<ERROR> type of KEY \"units.rotation_float\" is not correct in FILE %s",path.toStdString().c_str());
+                    throw QString::asprintf("<ERROR> type of KEY \"units.direction_speed\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.direction_speed=value.toDouble();
+            }
 
-                unit.rotation_float=value.toDouble();
+            ///direction_acc*
+            if(obj.contains("direction_acc"))
+            {
+                QJsonValue value=obj.value("direction_acc");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.direction_acc\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.direction_acc=value.toDouble();
+            }
+
+            ///float_direction*
+            if(obj.contains("float_direction"))
+            {
+                QJsonValue value=obj.value("float_direction");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_direction\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.float_direction=value.toDouble();
+            }
+
+            ///float_direction_speed*
+            if(obj.contains("float_direction_speed"))
+            {
+                QJsonValue value=obj.value("float_direction_speed");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_direction_speed\" is not correct in FILE %s",path.toStdString().c_str());
+
+                unit.float_direction_speed=value.toDouble();
+            }
+
+            ///float_direction_acc*
+            if(obj.contains("float_direction_acc"))
+            {
+                QJsonValue value=obj.value("float_direction_acc");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_direction_acc\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.float_direction_acc=value.toDouble();
+            }
+
+            ///float_magnitude_speed*
+            if(obj.contains("float_magnitude_speed"))
+            {
+                QJsonValue value=obj.value("float_magnitude_speed");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_magnitude_speed\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.float_magnitude_speed=value.toDouble();
+            }
+
+            ///float_magnitude_acc*
+            if(obj.contains("float_magnitude_acc"))
+            {
+                QJsonValue value=obj.value("float_magnitude_acc");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_magnitude_acc\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.float_magnitude_acc=value.toDouble();
+            }
+
+            ///float_lifetime*
+            if(obj.contains("float_lifetime"))
+            {
+                QJsonValue value=obj.value("float_lifetime");
+                if(!value.isDouble())
+                    throw QString::asprintf("<ERROR> type of KEY \"units.float_lifetime\" is not correct in FILE %s",path.toStdString().c_str());
+                unit.float_lifetime=value.toDouble();
             }
 
             ///probability*
