@@ -2,7 +2,9 @@
     "name":"TestScene",
     "description":"测试场景",
     "name_resource":"default",
-    "size":[2000,2000],
+    "image_internal":"019_R.png",
+    "image_external":"image_outside_border.png",
+    "size":[2000,1326],
     "pos_view":[0,0],
     "pos_initial":[0,0],
     "rules_generate":
@@ -11,9 +13,27 @@
             "rule":
             {
                 "flag_in_viewport":false,
-                "requirement_time":500,
-                "requirement_kills":0,
-                "number":5,
+                "position":[300.0,300.0],
+                "requirement_time":0,
+                "number":1,
+                "interval":0,
+                "name_object":"block_zero_blue",
+                "rotation":0
+            },
+            "action":
+            {
+                "flag_player_manip":true
+            }
+        },
+        {
+            "rule":
+            {
+                "flag_in_viewport":false,
+                "position":[-1.0,-1.0],
+                "requirement_time":50,
+                "requirement_score":0,
+                "number":400,
+                "interval":2,
                 "name_object":"block_zero_red",
                 "rotation":-1
             },

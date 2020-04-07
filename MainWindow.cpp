@@ -13,7 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
     init_signal_slots();
 
     //初始化程序内置数据
-    InnerData::init_inner_data();
+//    InnerData::init_inner_data();
 }
 
 MainWindow::~MainWindow()

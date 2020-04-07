@@ -30,12 +30,16 @@ struct StatusBarInfo
     Integer time_consumption_average{1};//平均时间消耗(ns为单位)
 };
 
-///对象控制线程
+///对象控制
 class ObjectsControl: public QObject
 {
     Q_OBJECT
 public:
     int count{0};
+
+    Integer cooldown{0};//场景生成冷却
+    Integer rest{0};//剩余
+    Scene::rule *unit{nullptr};//当前生成单元
 
     enum Status//状态
     {
@@ -48,17 +52,19 @@ public:
 public:
     Status status{Pause};
     //处理数据
-    static void process_data();
+    void process_data();
     //管理对象对象
-    static void manage_objects();
+    void manage_objects();
     //更新属性
-    static void update_property();
+    void update_property();
+
+    void reset();
 
 private:
     //派生对象(对象派生)
-    static void derive_object(const ObjectControlProperty &pro,const DeriveRule &rule);
+    void derive_object(const ObjectControlProperty &pro,const DeriveRule &rule);
     //生成对象(场景生成)
-    static void generate_object(const SceneGenerateRule &rule,const ObjectActionProperty &pro_a);
+    void generate_object(const SceneGenerateRule &rule,const ObjectActionProperty &pro_a);
 
 signals:
     void updated();//更新信号
@@ -90,7 +96,7 @@ public:
     Status status{Status::Over};//当前状态信息
     Page page_last{TitlePage};//上一个页面
 
-    Integer num_updates{0};//更新数
+//    Integer num_updates{0};//更新数
     Integer cooldown_next_data_update{0};//下一次数据更新
     Integer time_consumption_total{0};//总时间消耗
 
@@ -150,6 +156,9 @@ public:
     Button * button_resume_pause_menu{nullptr};
     Button * button_exit_pause_menu{nullptr};
     Button * button_to_info_page_pause_menu{nullptr};
+
+    //对象控制对象
+    ObjectsControl control{};
 
     ///线程对象
     ObjectsControl * object_thread_data_process{nullptr};

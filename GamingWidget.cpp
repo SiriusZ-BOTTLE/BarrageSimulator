@@ -7,12 +7,25 @@ RunTimeData data_runtime{};
 
 void ObjectsControl::process_data()
 {
-        QReadLocker(&data_runtime.lock);//读锁定
+//    QReadLocker(&data_runtime.lock);//读锁定
 //    QWriteLocker(&data_runtime.lock); //写锁定
 
+    auto start = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+
+    Integer count=0;
+    Integer time_basic=0;//物理属性更新总体时间(时间消耗非常小, 忽略不计)
+    Integer time_collision=0;//处理碰撞总体时间(时间消耗非常大)
+    Integer time_equation=0;//解方程时间(时间消耗非常小, 忽略不计)
+    Integer time_get_list=0;//获取碰撞列表时间(时间消耗非常大, 占据总体时间消耗的99%)
+
+    auto size=data_runtime.list_objects.size();
+
     ///物理计算
-    for (int index = 0; index < data_runtime.list_objects.size(); ++index)
+    for (int index = 0; index < size; ++index)
     {
+
+        auto start0 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+
         //        bool flag_max_velocity{false};//满速标记
         ///坐标计算
         FlyingObject *p_crt = data_runtime.list_objects[index];//当前对象
@@ -210,13 +223,25 @@ void ObjectsControl::process_data()
         }
 
 
+        auto end0 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
+        time_basic+=std::chrono::duration_cast<std::chrono::microseconds>(end0-start0).count();
+
+
+        auto start1 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+
         ///碰撞检测
-        if(!p_crt->property.flag_collision)//没有开启碰撞或已经处理过碰撞
+        if(!p_crt->property.flag_collision)//没有开启碰撞
             continue;//跳过
 
         //获取与当前元素发生碰撞的所有元素
-        auto list=data_runtime.scene_main->collidingItems(p_crt->item);
-//        QList<QGraphicsItem*> list/*= p_object->item->collidingItems()*/;
+
+        QList<QGraphicsItem*> list;
+        auto start_get_list = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+        list=data_runtime.scene_main->collidingItems(p_crt->item,Qt::IntersectsItemBoundingRect);
+        ++count;
+//        QList<QGraphicsItem*> list= p_crt->item->collidingItems();
+        auto end_get_list = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
+        time_get_list+=std::chrono::duration_cast<std::chrono::microseconds>(end_get_list-start_get_list).count();
 
         bool flag_clear_last_collisio=true;//清空上次碰撞的标记
 
@@ -240,20 +265,17 @@ void ObjectsControl::process_data()
             //计算轴线弧度
             radian = qAtan2(tmp1.second,tmp1.first);
 
+            //检查是否与之前碰撞的对象再次碰撞(消除碰撞粘性)
+//            if(p_crt->id_last_collision==p_another->id)
+//            {
+//                flag_clear_last_collisio=false;
+//                flag_continue=true;
+//            }
+//            if(p_another->id_last_collision==p_crt->id)
+//                flag_continue=true;//跳过
 
-            //检查是否与之前碰撞的对象再次碰撞(粘性)
-            if(p_crt->id_last_collision==p_another->id)
-            {
-                flag_clear_last_collisio=false;
-                flag_continue=true;
-            }
-            if(p_another->id_last_collision==p_crt->id)
-                flag_continue=true;//跳过
-
-            if(!p_another->property.flag_collision)//查看是否开启碰撞标记
-                flag_continue=true;//没开标记跳过
-
-
+//            if(!p_another->property.flag_collision)//查看是否开启碰撞标记(现在会在collideWithItem函数中检测)
+//                flag_continue=true;//没开标记跳过
 
             //都是碰撞对象
             ///处理game数据
@@ -277,6 +299,7 @@ void ObjectsControl::process_data()
                 }
             }
 
+            //穿透
             if(pro_g_crt.penetrability>pro_g_ano.resist||pro_g_ano.penetrability>pro_g_crt.resist)
             {
                 //互相设置穿透id
@@ -345,6 +368,10 @@ void ObjectsControl::process_data()
 //            qDebug()<<"<radian> "<<radian;
 //            qDebug()<<"<speed_axis> "<<tmp1<<" "<<tmp2;
 
+
+            auto start2 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+
+
             ///轴向发生正碰, 动量守恒, 动能按系数损失(解二元二次方程)
             Decimal m1=pro.mass,m2=p_another->property.mass;// m1, m2
             Decimal x1,x2,d_tmp,c1=0,c2=0, y1,y2;
@@ -377,6 +404,11 @@ void ObjectsControl::process_data()
             //计算两个解对应的另一个速度
             y1 = (c1-m1*x1)/m2;
             y2 = (c1-m1*x2)/m2;
+
+            auto end2 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
+            auto t2 = std::chrono::duration_cast<std::chrono::microseconds>(end2-start2).count();
+
+            time_equation+=t2;
 
             //以下注释代码含有BUG
 /*            if(std::signbit(tmp1.first)==std::signbit(tmp2.first))//速度方向相同, 追击碰撞
@@ -413,32 +445,38 @@ void ObjectsControl::process_data()
             pro.speed_polar.first+=radian;
             p_another->property.speed_polar.first+=radian;
 
-//            qDebug()<<"<speed> "<<pro.speed_polar.first*R2D<<" "<<pro.speed_polar.second;
-//            qDebug()<<"<speed> "<<p_another->property.speed_polar.first*R2D<<" "<<p_another->property.speed_polar.second;
 
             p_crt->id_last_collision=p_another->id;
             p_another->id_last_collision=p_crt->id;
 
             ///非轴向动量守恒, 动能按系数转换为转动动能
 
-//            break;//一个元素一次只处理一个碰撞
         }
 
-        if(flag_clear_last_collisio)//重置id
-        {
-            p_crt->id_penetrating=-1;
-            p_crt->id_last_collision=-1;
-        }
+//        if(flag_clear_last_collisio)//重置id
+//        {
+//            p_crt->id_penetrating=-1;
+//            p_crt->id_last_collision=-1;
+//        }
 
+        auto end1 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
+
+        auto t1 = std::chrono::duration_cast<std::chrono::microseconds>(end1-start1).count();
+
+        time_collision+=t1;
 
     }
 
+    auto end = std::chrono::steady_clock::now();
+    auto time_total = std::chrono::duration_cast<std::chrono::microseconds>(start-end).count();
+
+    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
     ///AI控制
 }
 
 void ObjectsControl::manage_objects()
 {
-    QWriteLocker(&data_runtime.lock); //写锁定
+//    QWriteLocker(&data_runtime.lock); //写锁定
 
     ///对象派生
     for (int index = 0; index < data_runtime.list_objects.size(); ++index)
@@ -468,12 +506,10 @@ void ObjectsControl::manage_objects()
         if(pro.number_rest_collision==0)
             flag_destroy=true;
 
-        if(p_crt->type==ObjectType::ManipulableObject)
-        {
-            //检查耐久
-            if((p_crt)->property_gaming.endurance.first<0)
-                flag_destroy=true;
-        }
+
+        //检查耐久
+        if((p_crt)->property_gaming.endurance.first<0)
+            flag_destroy=true;
 
         if(flag_destroy)//销毁对象
         {
@@ -491,8 +527,8 @@ void ObjectsControl::manage_objects()
 
 
         ///派生对象
-        if (!pro.rule) //派生规则不存在
-            continue;  //跳过
+        if (pro.rule<0) //派生规则不存在
+            continue;   //跳过
 
         if (pro.cooldown_drive > 0)
         {
@@ -512,31 +548,65 @@ void ObjectsControl::manage_objects()
 
     }
 
-    //获取当前规则的引用
-    auto & unit=data_runtime.scene.rules_generate[data_runtime.index_crt_generate_rule];
+
     ///场景生成
-    if(data_runtime.index_crt_generate_rule<data_runtime.scene.rules_generate.size()
-            &&data_runtime.num_updates>=unit.first.requirement_time&&data_runtime.score>=unit.first.requirement_score)
+    Integer size=static_cast<Integer>(data_runtime.scene.rules_generate.size());
+
+    if(size==data_runtime.index_crt_generate_rule)
+        return;
+
+    if(cooldown>0)
+        --cooldown;
+
+    if(cooldown==0)
     {
-        //满足时间需求, 且满足分数需求
-        generate_object(unit.first,unit.second);//生成对象
-        ++data_runtime.index_crt_generate_rule;//下一条规则
+
+        if(rest==0)
+        {
+            ++data_runtime.index_crt_generate_rule;//下一条规则
+
+            if(size>data_runtime.index_crt_generate_rule)
+                unit=&data_runtime.scene.rules_generate[static_cast<size_t>(data_runtime.index_crt_generate_rule)];
+            rest=unit->first.number-1;
+        }
+        else
+            --rest;
+        //获取当前规则的引用
+
+
+        if(rest!=0||(data_runtime.num_updates>=unit->first.requirement_time
+                &&data_runtime.score>=unit->first.requirement_score))
+        {
+            generate_object(unit->first,unit->second);//生成对象
+            cooldown=unit->first.interval;//设置冷却
+        }
     }
+
 }
 
 void ObjectsControl::update_property()
 {
 
-    QReadLocker(&data_runtime.lock); //读锁定
+//    QReadLocker(&data_runtime.lock); //读锁定
 
-    //    QWriteLocker(&data_runtime.lock);
+//    QWriteLocker(&data_runtime.lock);
 
     for (auto object : data_runtime.list_objects)
     {
         object->item->setPos(object->property.coordinate.first, object->property.coordinate.second); //更新位置
         object->item->setRotation(object->property.rotation.first);                                  //更新角度
+
+        Element* p = static_cast<Element*>(object->item);//下一帧
+        if(p->number_frame>1)
+            p->next_frame();
         continue;
     }
+}
+
+void ObjectsControl::reset()
+{
+    this->unit=nullptr;
+    this->cooldown=this->rest=0;
 }
 
 void ObjectsControl::derive_object(const ObjectControlProperty &pro,const DeriveRule &rule)
@@ -548,24 +618,11 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
     {
         if(ToolFunctionsKit::get_random_decimal_0_1()>unit.probability)
             continue;
-        try
-        {
-            obj_new = new FlyingObject(*(unit.object)); //申请新对象
-        }
-        catch (std::exception &e)
-        {
-            qDebug() << e.what();
-            continue;
-        }
 
-        if (obj_new == nullptr)
-        {
-            qDebug() << "<fail> new a object";
-            break;
-        }
+        obj_new = new FlyingObject(*(unit.object)); //申请新对象
 
         ///处理旋转方向
-        Decimal range_rotation_float = 360 * unit.rotation_float;                                         //获取浮动总范围
+        Decimal range_rotation_float = 360 * unit.rotation_float;                                            //获取浮动总范围
         Decimal offset_rotation = (ToolFunctionsKit::get_random_decimal_0_1() - 0.5) * range_rotation_float; //获取浮动值
         obj_new->property.rotation.first = offset_rotation;
 
@@ -573,7 +630,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
         {
         case DR::RelativeToParentDirection: //相对基对象
         {
-            obj_new->property.rotation.first += pro.rotation.first - pro.offset_front;
+            obj_new->property.rotation.first = pro.rotation.first - pro.offset_front;
             break;
         }
         case DR::RelativeToParentSpeed: //相对基对象速度
@@ -586,7 +643,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
             obj_new->property.rotation.first += pro.acceleration_polar.first * R2D;
             break;
         }
-        case DR::Absolute: //绝对旋转
+        case DR::Absolute: //绝对方向
             break;
         }
 
@@ -645,76 +702,74 @@ void ObjectsControl::generate_object(const SceneGenerateRule &rule, const Object
     if(data_runtime.pkg.objects.find(rule.name_object)==data_runtime.pkg.objects.end())
         throw QString::asprintf("<ERROR> cannot find object %s in pkg %s",rule.name_object.toStdString().c_str(),data_runtime.pkg.path_pkg.toStdString().c_str());
     auto &obj_target=data_runtime.pkg.objects[rule.name_object];//获取目标对象引用
-    for(int i=0;i<rule.number;++i)//逐个生成
+
+    FlyingObject * obj_new=new FlyingObject(obj_target);//复制构造
+
+    //处理坐标
+    if(rule.position.x()<0)//横坐标小于0, 随机放置
     {
-        FlyingObject * obj_new=new FlyingObject(obj_target);//复制构造
+        //随机横坐标
+        obj_new->property.coordinate.first=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene_main->width();
 
-        //处理坐标
-        if(rule.position.x()<0)//横坐标小于0, 随机放置
+        //随机纵坐标
+        if(!rule.flag_in_viewport
+                &&obj_new->property.coordinate.first>data_runtime.scene_main->rect_exposed.left()
+                &&obj_new->property.coordinate.first<data_runtime.scene_main->rect_exposed.right())//视图内不可放置
         {
-            //随机横坐标
-            obj_new->property.coordinate.first=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene_main->width();
-
-            //随机纵坐标
-            if(!rule.flag_in_viewport
-                    &&obj_new->property.coordinate.first>data_runtime.view_main->sceneRect().left()
-                    &&obj_new->property.coordinate.first<data_runtime.view_main->sceneRect().right())//视图内不可放置
+            //纵坐标可能在视图内
+            if(data_runtime.scene_main->rect_exposed.top()<0)//顶部无间隙
             {
-                //纵坐标可能在视图内
-                if(data_runtime.view_main->sceneRect().top()<0)//顶部无间隙
-                {
-                    obj_new->property.coordinate.second=
-                            ToolFunctionsKit::get_random_decimal_0_1()
-                            *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().bottom())
-                            +data_runtime.view_main->sceneRect().bottom();
-                }
-                else if(data_runtime.view_main->sceneRect().bottom()>data_runtime.scene_main->height())//底部无间隙
-                {
-                    obj_new->property.coordinate.second=
-                            ToolFunctionsKit::get_random_decimal_0_1()
-                            *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().top());
-                }
-                else//上下都有间隙
-                {
-                    if(ToolFunctionsKit::get_random_decimal_0_1()<0.5)//选择上间隙
-                    {
-                        obj_new->property.coordinate.second=
-                                ToolFunctionsKit::get_random_decimal_0_1()
-                                *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().top());
-                    }
-                    else//选择下间隙
-                    {
-                        obj_new->property.coordinate.second=
-                                ToolFunctionsKit::get_random_decimal_0_1()
-                                *(data_runtime.scene_main->height()-data_runtime.view_main->sceneRect().bottom())
-                                +data_runtime.view_main->sceneRect().bottom();
-                    }
-
-                }
+                obj_new->property.coordinate.second=
+                        ToolFunctionsKit::get_random_decimal_0_1()
+                        *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.bottom())
+                        +data_runtime.scene_main->rect_exposed.bottom();
             }
-            else//视图内可以放置或横坐标不在范围内
-                obj_new->property.coordinate.second=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene.size.ry();
+            else if(data_runtime.scene_main->rect_exposed.bottom()>data_runtime.scene_main->height())//底部无间隙
+            {
+                obj_new->property.coordinate.second=
+                        ToolFunctionsKit::get_random_decimal_0_1()
+                        *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.top());
+            }
+            else//上下都有间隙
+            {
+                if(ToolFunctionsKit::get_random_decimal_0_1()<0.5)//选择上间隙
+                {
+                    obj_new->property.coordinate.second=
+                            ToolFunctionsKit::get_random_decimal_0_1()
+                            *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.top());
+                }
+                else//选择下间隙
+                {
+                    obj_new->property.coordinate.second=
+                            ToolFunctionsKit::get_random_decimal_0_1()
+                            *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.bottom())
+                            +data_runtime.scene_main->rect_exposed.bottom();
+                }
+
+            }
         }
-        else//固定放置
-        {
-            obj_new->property.coordinate.first=rule.position.x();
-            obj_new->property.coordinate.second=rule.position.y();
-        }
-
-        //处理旋转(方向)
-        if(rule.rotation<0)
-            obj_new->property.rotation.first=360*ToolFunctionsKit::get_random_decimal_0_1();//随机旋转
-        else
-            obj_new->property.rotation.first=rule.rotation;
-
-        obj_new->property_action=pro_a;//设置行为属性
-
-        if(pro_a.flag_player_manip)//player操纵
-            data_runtime.p1=obj_new;//设置
-
-        data_runtime.list_objects.push_back(obj_new); //添加到管理列表
-        obj_new->add_to_scene(data_runtime.scene_main);//添加到场景
+        else//视图内可以放置或横坐标不在范围内
+            obj_new->property.coordinate.second=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene.size.ry();
     }
+    else//固定放置
+    {
+        obj_new->property.coordinate.first=rule.position.x();
+        obj_new->property.coordinate.second=rule.position.y();
+    }
+
+    //处理旋转(方向)
+    if(rule.rotation<0)
+        obj_new->property.rotation.first=360*ToolFunctionsKit::get_random_decimal_0_1();//随机旋转
+    else
+        obj_new->property.rotation.first=rule.rotation;
+
+    obj_new->property_action=pro_a;//设置行为属性
+
+    if(pro_a.flag_player_manip)//player操纵
+        data_runtime.p1=obj_new;//设置
+
+    data_runtime.list_objects.push_back(obj_new); //添加到管理列表
+    obj_new->add_to_scene(data_runtime.scene_main);//添加到场景
 }
 
 
@@ -745,8 +800,6 @@ void GameWidget::init_components()
     layout_main = new QGridLayout();
     //scene_main并不是字段, 是全局变量
     data_runtime.scene_main = new GraphicsScene(0, 0, Settings::width_gaming, Settings::height_gaming);
-    data_runtime.scene_main->setItemIndexMethod(QGraphicsScene::NoIndex);//无索引(对于动态元素效果更好)
-
     data_runtime.view_main = new GraphicsView(data_runtime.scene_main);
 
     //标题页场景
@@ -936,6 +989,8 @@ void GameWidget::init_UI()
 
     ///game页
     auto p =new QOpenGLWidget();
+
+    data_runtime.scene_main->setItemIndexMethod(QGraphicsScene::ItemIndexMethod::BspTreeIndex);//无索引(对于动态元素效果更好)
     data_runtime.view_main->setViewport(p);
     data_runtime.view_main->setMouseTracking(true);
 
@@ -1005,6 +1060,7 @@ void GameWidget::init_signal_slots()
     connect(model_selection, &QItemSelectionModel::selectionChanged,this,&GameWidget::handle_select);
     connect(button_play_start, &QPushButton::clicked,this,&GameWidget::load_scene);
 
+    connect(button_exit_pause_menu, &QPushButton::clicked,this,&GameWidget::exit);
 }
 
 void GameWidget::init_threads()
@@ -1241,6 +1297,7 @@ void GameWidget::load_scene()
 
         goto_page(GamePage);
 
+        this->view_title->setVisible(false);
         this->timer_title.stop();//关闭主界面
         this->status=Status::Running;
         this->timer.start(Settings::interval);
@@ -1291,10 +1348,15 @@ void GameWidget::initialize()
 
 void GameWidget::reset()
 {
-    this->hide();//隐藏
+    qDebug()<<"reset()";
+    this->status=Status::Over;
     timer.stop();//结束定时器
-    timer_title.stop();
+    timer_title.start();
+    this->view_title->setVisible(true);
     this->clear();
+    goto_start_page();
+    control.reset();
+    this->cooldown_next_data_update=0;
 }
 
 void GameWidget::start()
@@ -1355,7 +1417,8 @@ void GameWidget::update()
     start=std::chrono::steady_clock::now();
     auto tt = std::chrono::duration_cast<std::chrono::microseconds>(start-end).count();
     time_consumption_total+=tt;
-    if(num_updates%Settings::count_frames==0)
+
+    if(data_runtime.num_updates%Settings::count_frames==0)
     {
         info_status_bar.time_consumption_average=time_consumption_total/Settings::count_frames;//计算平均时长
         time_consumption_total=0;
@@ -1363,9 +1426,8 @@ void GameWidget::update()
 
     info_status_bar.time_consumption=tt;
 
-
     info_status_bar.pos_mouse = data_runtime.view_main->pos_mouse;                                //鼠标坐标
-    info_status_bar.num_updates = num_updates;                                       //更新数
+    info_status_bar.num_updates =data_runtime.num_updates;                                       //更新数
     info_status_bar.num_objects = data_runtime.list_objects.size();                  //对象数量
     data_runtime.pos_mouse_scene = data_runtime.view_main->pos_mouse; //鼠标坐标
 
@@ -1377,9 +1439,9 @@ void GameWidget::update()
 
         try
         {
-            ObjectsControl::process_data();    //数据处理
-            ObjectsControl::manage_objects();  //管理对象
-            ObjectsControl::update_property(); //更新元素属性
+            control.process_data();    //数据处理
+            control.manage_objects();  //管理对象
+            control.update_property(); //更新元素属性
         }
         catch(const QString &e)
         {
@@ -1391,9 +1453,9 @@ void GameWidget::update()
         if (mouse_delay > 0)
             --mouse_delay;
 
-        data_runtime.view_main->centerOn(data_runtime.p1->item);//保持中心
+        if(data_runtime.p1->item)
+            data_runtime.view_main->centerOn(data_runtime.p1->item);//保持中心
 
-        ++data_runtime.num_updates;//更新数据更新数
     }
     key_process(); //按键处理
 
@@ -1402,9 +1464,7 @@ void GameWidget::update()
     data_runtime.view_main->update(); //视图更新
 //    view_main->viewport()->update();
 //    view_main->repaint();
-    ++num_updates;
-
-
+    ++data_runtime.num_updates;
 }
 
 void GameWidget::update_bg_image_position()
@@ -1526,8 +1586,23 @@ void GameWidget::exit()
     {
         break;
     }
+    case LogPage:
+    {
+        this->close_log_page();
+        break;
+    }
+    case GamePage:
+    {
+        reset();
+        break;
+    }
+    case OptionPage:
+    {
+        break;
+    }
 
     }
+    esc();
 
 }
 

@@ -1,0 +1,44 @@
+{
+    "id":0,
+    "period":1,
+    "units":[
+        {
+            "object":"bullet_type0_blue",
+            "ref_direction":"RelativeToParentDirection",
+            "flag_inherit_speed":false,
+            "flag_relative_position":true,
+            "position":[0,-50.0],
+            "speed":[0,-1],
+            "acceleration":[0,-1],
+            "rotation":0,
+            "rotation_float":0.02,
+            "probability":1.0
+        },
+        {
+            "object":"bullet_type0_blue",
+            "ref_direction":"RelativeToParentDirection",
+            "flag_inherit_speed":false,
+            "flag_relative_position":true,
+            "position":[0,-50.0],
+            "speed":[0,-1],
+            "acceleration":[0,-1],
+            "rotation":0,
+            "rotation_float":0.02,
+            "probability":1.0
+        }
+        ,
+        {
+            "object":"bullet_type0_blue",
+            "ref_direction":"RelativeToParentDirection",
+            "flag_inherit_speed":false,
+            "flag_relative_position":true,
+            "position":[0,-50.0],
+            "speed":[0,-1],
+            "acceleration":[0,-1],
+            "rotation":0,
+            "rotation_float":0.02,
+            "probability":1.0
+        }
+        
+    ]
+}

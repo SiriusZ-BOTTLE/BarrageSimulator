@@ -1,0 +1,19 @@
+{
+    "id":1,
+    "period":0,
+    "units":[
+        {
+            "object":"exploding_square32",
+            "ref_direction":"RelativeToParentDirection",
+            "flag_inherit_speed":false,
+            "flag_relative_position":true,
+            "position":[0,0],
+            "speed":[0,0],
+            "acceleration":[0,0],
+            "rotation":0,
+            "rotation_float":0.1,
+            "probability":1.0
+        }
+        
+    ]
+}

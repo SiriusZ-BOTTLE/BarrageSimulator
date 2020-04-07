@@ -59,6 +59,7 @@
 #endif
 #endif
 
+//#pragma GCC optimize(2)
 
 /*
  *  核心头文件
@@ -305,14 +306,18 @@ namespace Core
     public:
         Objects::FlyingObject * object{nullptr};//欲放置的对象指针
         //方向参照(该模式定义了放置时的初始角度, 速度, 加速度的基本参照)
-        DR ref_direction{DR::RelativeToParentDirection};//(默认以基对象的朝向为参照)
+        DR ref_direction{DR::RelativeToParentDirection};//派生对象方向参照(默认以基对象的朝向为参照)
+        DR ref_speed_direction{DR::RelativeToParentDirection};//派生对象速度方向参照(默认以基对象的朝向为参照)
+        DR ref_acc_direction{DR::RelativeToParentDirection};//派生对象速加度方向参照(默认以基对象的朝向为参照)
         bool flag_inherit_speed{true};//继承父对象速度(继承的速度是相对于场景的)
         bool flag_relative_position{true};//相对位置
         BinaryVector<Decimal> position{0,0};//初始位置
         BinaryVector<Decimal> speed{0,0};//初始速度(极坐标, 若大小小于0, 则使用最大速度)
+        Decimal speed_float{0.0};//速度大小浮动百分比
         BinaryVector<Decimal> acceleration{0,0};//初始加速度(极坐标, 若大小小于0, 则使用最大加速度)
+        Decimal acc_float{0.0};//加速度大小浮动百分比
         Decimal rotation{0.0};//初始角度
-        Decimal rotation_float{0.0};//方向浮动百分比(确定了方向之后进行浮动)
+        Decimal rotation_float{0.0};//总体方向浮动百分比(确定了方向之后进行浮动, 这里"方向", "速度方向", "加速度方向是分开的")
         Decimal probability{1.0};//派生概率[0.0,1.0]
     };
 
@@ -383,19 +388,20 @@ namespace Core
         int period_frame{0};//周期
         int cooldown_next_frame{0};//下一帧冷却
         int frame_current{0};//当前帧
+        Decimal edge{0.0};//边缘(可能发生碰撞的最远距离)
         QVector<QPixmap> frames{};//从原图上剪切下来的不同帧, 作为动画播放
 //        QPointF offset{0.0,0.0};//偏移量
 //        QRectF rect_bounding{};//边界矩形
     public:
         Element()=delete;//被删去的默认构造函数
         //构造函数, 指定图片, 指定帧数, 周期
-        Element(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10);
+        Element(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10,const QPointF &center={0.0,0.0});
         //复制构造函数(复制构造时不会复制父对象指针, 注意基类的复制构造函数被显式删除了)
         Element(const Element&ano);
         //显示下一帧
         void next_frame();
 
-        void set_frames(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10);
+        void set_frames(const QPixmap& pixmap ,const int& number_frame=1,const int &period_frame=10,const QPointF &center={0.0,0.0});
         //设置偏移量(中心)
 //        void set_offset(const QPointF &offset);
 
@@ -520,6 +526,7 @@ namespace Core
             Integer requirement_score{0};//分数需求
 
             Integer number{1};//生成数量
+            Integer interval{0};//生成间隔
             QString name_object{""};//要生成的对象的名称
 
             Decimal rotation{0.0};//初始旋转角度, 小于0则随机角度
@@ -529,6 +536,10 @@ namespace Core
         class Scene
         {
         public:
+            using rule=std::pair<SceneGenerateRule,ObjectActionProperty>;
+        public:
+
+
             QString name{"Undefined"};//场景名称
             QString path_file{""};//json文件路径
             QString description{"Undefined"};//描述
@@ -545,7 +556,7 @@ namespace Core
 
             Integer index_crt_rule{0};//当前生成规则索引
 
-            std::vector<std::pair<SceneGenerateRule,ObjectActionProperty>> rules_generate;//生成规则(注意生成时只能按照顺序)
+            std::vector<rule> rules_generate;//生成规则(注意生成时只能按照顺序)
             std::vector<Integer> rules_player;
 
 //            ResourcePackage pkg;//资源包
@@ -584,7 +595,7 @@ namespace Core
         GraphicsScene *scene_main{nullptr};//场景
         GraphicsView * view_main{nullptr};//视图
 
-        size_t index_crt_generate_rule{0};//当前生成规则
+        Integer index_crt_generate_rule{-1};//当前生成规则
         ///依赖数据
         ResourcePackage pkg{};//资源包
         Game::Scene scene{};//场景

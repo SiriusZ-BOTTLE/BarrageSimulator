@@ -12,7 +12,7 @@
         "flag_boundary_restriction":false,
         "flag_collision":true,
         "flag_channel_collision":false,
-        "number_rest_collision":1,
+        "number_rest_collision":10,
         "rule":-1,
         "rule_on_collision":-1,
         "rule_on_destroy":1,
@@ -33,10 +33,10 @@
     "property_game":
     {
         "flag_team_kill":false,
-        "team":1,
+        "team":2,
         "score":0,
         "endurance":[100,100],
-        "damage":20,
+        "damage":10,
         "resist":100,
         "penetrability":5
     }

@@ -30,6 +30,8 @@ public:
     QBrush brush_internal{};//内部笔刷
     QBrush brush_external{};//外部笔刷
 
+    QRectF rect_exposed{};//暴露的矩形
+
 public:
     //绘制背景
     void drawBackground(QPainter *painter, const QRectF &rect) override;
