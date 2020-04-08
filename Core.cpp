@@ -57,8 +57,6 @@ namespace Settings
 
         map_keys[27]=Key::ESC;//ESC
 
-
-
     }
 
     //标题图片路径
@@ -71,7 +69,10 @@ namespace Settings
     QString path_resource_pkg="./data/resources/";
     //
     QString path_images="/images/";
-
+    //音效文件
+    QString path_sounds="./data/sounds/";
+    //
+    QString path_musics="";
 
 }
 

@@ -676,6 +676,10 @@ using namespace Core;
     extern QString path_resource_pkg;
     //资源包下图片路径
     extern QString path_images;
+    //音效文件(程序音效文件)
+    extern QString path_sounds;
+    //音乐文件(程序音乐文件)
+    extern QString path_musics;
 
 }
 
