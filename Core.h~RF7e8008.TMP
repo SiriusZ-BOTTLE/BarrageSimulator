@@ -20,9 +20,6 @@
 #include <QListWidget>
 #include <QTextBrowser>
 
-#include <QSound>
-#include <QSoundEffect>
-
 #include <QMetaType>
 #include <QLabel>
 #include <QGridLayout>
@@ -32,6 +29,8 @@
 #include <QReadWriteLock>//读写锁
 #include <QReadLocker>//RAII锁
 #include <QWriteLocker>//RAII锁
+#include <QSound>//声音
+#include <QSoundEffect>//音效
 //json
 #include <QFile>
 #include <QJsonDocument>
@@ -638,9 +637,6 @@ using namespace Core;
     extern bool flag_music;//音乐开关
     extern bool flag_sound;//音效开关
 
-    extern Decimal volume_music;//音乐音量
-    extern Decimal volume_sound;//音效音量
-
     extern int width_interface;//界面宽度
     extern int height_interface;//界面高度
 
@@ -671,7 +667,6 @@ using namespace Core;
     extern void reset_key_map();
 
 
-
     //标题图片路径
     extern QString path_title_image;
     //背景图目录
@@ -682,13 +677,14 @@ using namespace Core;
     extern QString path_resource_pkg;
     //资源包下图片路径
     extern QString path_images;
-    //音效文件(程序音效文件)
+    //音效文件(程序音效文件路径)
     extern QString path_sounds;
-    //音乐文件(程序音乐文件)
+    //音乐文件(程序音乐文件路径)
     extern QString path_musics;
-    //按钮hover
+
+    //按钮hover事件音效文件
     extern QString file_sound_button_hover;
-    //按钮click
+    //按钮click事件音效路径
     extern QString file_sound_button_click;
 
 }

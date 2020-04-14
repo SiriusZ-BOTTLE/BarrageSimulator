@@ -186,6 +186,10 @@ public:
 
     ///背景图片集合
     QVector<QPixmap> images_title{};
+
+    ///音效集合
+    QMap<QString, QSoundEffect> sound_effects{};
+
     //速度
     BinaryVector<Decimal> speed_bg_moving{0,0};
 
@@ -219,6 +223,8 @@ private:
     void init_threads();
     //加载标题页背景图片
     void load_title_images();
+    //读取音频文件
+    void load_audio_files();
 
     //按键处理
     void key_process();

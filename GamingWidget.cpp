@@ -1182,7 +1182,8 @@ void GameWidget::load_title_images()
 
     if(!dir.exists()||infos.size()==0)
     {
-        this->label_bottom_info_title->setText("No background images found in DIR "+Settings::path_dir_title_bg);
+        this->label_bottom_info_title->setText("<WARN> No background images found in DIR "+Settings::path_dir_title_bg);
+        emit signal_push_info("<WARN> No background images found in DIR "+Settings::path_sounds);
         return;
     }
 
@@ -1200,6 +1201,34 @@ void GameWidget::load_title_images()
 //    timer_title.start();
 
     scene_title->addItem(&bg);//添加到场景
+}
+
+void GameWidget::load_audio_files()
+{
+    QDir dir(Settings::path_sounds);
+    QStringList filter{"*.wav"};
+
+    QFileInfoList infos=dir.entryInfoList(filter,QDir::Files|QDir::Readable,QDir::Name);
+
+    if(!dir.exists()||infos.size()==0)
+    {
+        this->label_bottom_info_title->setText("<WARN> No sound files found in DIR "+Settings::path_sounds);
+        emit signal_push_info("<WARN> No sound files found in DIR "+Settings::path_sounds);
+        return;
+    }
+
+    QSoundEffect effect;
+
+    //读取全部音频文件并放入容器
+    for(QFileInfo info:infos)
+    {
+        effect.setSource(info.filePath());
+        sound_effects.insert(info.fileName(),effect);//添加到容器
+    }
+
+//    if(sound_effects.find(Settings:))
+
+
 }
 
 void GameWidget::key_process()
