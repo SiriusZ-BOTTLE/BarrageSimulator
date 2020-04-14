@@ -2,7 +2,7 @@
     "name":"TestScene",
     "description":"测试场景",
     "name_resource":"default",
-    "image_internal":"019_R.png",
+    "image_internal":"063_R.png",
     "image_external":"image_outside_border.png",
     "size":[2000,1326],
     "pos_view":[0,0],
@@ -32,7 +32,7 @@
                 "position":[-1.0,-1.0],
                 "requirement_time":0,
                 "requirement_score":0,
-                "number":250,
+                "number":400,
                 "interval":0,
                 "name_object":"block_zero_red",
                 "rotation":-1

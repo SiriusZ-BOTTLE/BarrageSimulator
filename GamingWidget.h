@@ -37,6 +37,7 @@ class ObjectsControl: public QObject
 public:
     int count{0};
 
+    //用于场景生成的字段
     Integer cooldown{0};//场景生成冷却
     Integer rest{0};//剩余
     Scene::rule *unit{nullptr};//当前生成单元
@@ -53,6 +54,8 @@ public:
     Status status{Pause};
     //处理数据
     void process_data();
+    //处理碰撞
+    void process_collision();
     //管理对象对象
     void manage_objects();
     //更新属性

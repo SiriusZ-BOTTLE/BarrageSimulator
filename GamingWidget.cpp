@@ -2,21 +2,20 @@
 
 ///全局变量定义
 RunTimeData data_runtime{};
-//GraphicsScene *scene_main{nullptr};
-//GraphicsView * view_main{nullptr};//视图
 
 void ObjectsControl::process_data()
 {
-//    QReadLocker(&data_runtime.lock);//读锁定
-//    QWriteLocker(&data_runtime.lock); //写锁定
+    QReadLocker locker(&data_runtime.lock);//读锁定
+//    QWriteLocker locker(&data_runtime.lock); //写锁定
+//    QMutexLocker locker(&data_runtime.mutex);
 
     auto start = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
 
-    Integer count=0;
-    Integer time_basic=0;//物理属性更新总体时间(时间消耗非常小, 忽略不计)
-    Integer time_collision=0;//处理碰撞总体时间(时间消耗非常大)
-    Integer time_equation=0;//解方程时间(时间消耗非常小, 忽略不计)
-    Integer time_get_list=0;//获取碰撞列表时间(时间消耗非常大, 占据总体时间消耗的99%)
+//    Integer count=0;
+//    Integer time_basic=0;//物理属性更新总体时间(时间消耗非常小, 忽略不计)
+//    Integer time_collision=0;//处理碰撞总体时间(时间消耗非常大)
+//    Integer time_equation=0;//解方程时间(时间消耗非常小, 忽略不计)
+//    Integer time_get_list=0;//获取碰撞列表时间(时间消耗非常大, 占据总体时间消耗的99%)
 
     auto size=data_runtime.list_objects.size();
 
@@ -137,7 +136,7 @@ void ObjectsControl::process_data()
             pro.angular_initial_target.second = qAtan2(pro.target_aming.second - pos.second, pro.target_aming.first - pos.first) * R2D + pro.offset_front;
 
             //获取当前角度
-            pro.rotation.first = p_crt->item->rotation();
+            pro.rotation.first = p_crt->property.rotation.first;
 
             //将两个角度转换为区间[0,360]内的等效值
             while (pro.angular_initial_target.second > 360)
@@ -223,11 +222,33 @@ void ObjectsControl::process_data()
         }
 
 
-        auto end0 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
-        time_basic+=std::chrono::duration_cast<std::chrono::microseconds>(end0-start0).count();
+
+    }
 
 
-        auto start1 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
+//    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
+    ///AI控制
+}
+
+void ObjectsControl::process_collision()
+{
+    QReadLocker locker(&data_runtime.lock);//读锁定
+//    QWriteLocker locker(&data_runtime.lock); //写锁定
+//    QMutexLocker locker(&data_runtime.mutex);
+    auto size=data_runtime.list_objects.size();
+    for (int index = 0; index < size; ++index)
+    {
+        ///坐标计算
+        FlyingObject *p_crt = data_runtime.list_objects[index];//当前对象
+        auto &pro = p_crt->property;         //物理属性
+        auto &acc_p = pro.acceleration_polar;   //加速度_极坐标
+        auto &acc_a = pro.acceleration_axis;    //加速度_轴坐标
+        auto &v_p = pro.speed_polar;            //速度_极坐标
+        auto &v_a = pro.speed_axis;             //加速度_轴坐标
+        auto &pos = pro.coordinate;             //位置
+        auto &att_v = pro.attenuation_velocity; //速度衰减
+        auto &pos_mouse = data_runtime.pos_mouse_scene;//鼠标位置
+
 
         ///碰撞检测
         if(!p_crt->property.flag_collision)//没有开启碰撞
@@ -236,12 +257,8 @@ void ObjectsControl::process_data()
         //获取与当前元素发生碰撞的所有元素
 
         QList<QGraphicsItem*> list;
-        auto start_get_list = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
         list=data_runtime.scene_main->collidingItems(p_crt->item,Qt::IntersectsItemBoundingRect);
-        ++count;
 //        QList<QGraphicsItem*> list= p_crt->item->collidingItems();
-        auto end_get_list = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
-        time_get_list+=std::chrono::duration_cast<std::chrono::microseconds>(end_get_list-start_get_list).count();
 
         bool flag_clear_last_collisio=true;//清空上次碰撞的标记
 
@@ -407,10 +424,6 @@ void ObjectsControl::process_data()
             y1 = (c1-m1*x1)/m2;
             y2 = (c1-m1*x2)/m2;
 
-            auto end2 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
-            auto t2 = std::chrono::duration_cast<std::chrono::microseconds>(end2-start2).count();
-
-            time_equation+=t2;
 
             //以下注释代码含有BUG
 /*            if(std::signbit(tmp1.first)==std::signbit(tmp2.first))//速度方向相同, 追击碰撞
@@ -454,31 +467,13 @@ void ObjectsControl::process_data()
             ///非轴向动量守恒, 动能按系数转换为转动动能
 
         }
-
-//        if(flag_clear_last_collisio)//重置id
-//        {
-//            p_crt->id_penetrating=-1;
-//            p_crt->id_last_collision=-1;
-//        }
-
-        auto end1 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时结束
-
-        auto t1 = std::chrono::duration_cast<std::chrono::microseconds>(end1-start1).count();
-
-        time_collision+=t1;
-
     }
-
-    auto end = std::chrono::steady_clock::now();
-    auto time_total = std::chrono::duration_cast<std::chrono::microseconds>(start-end).count();
-
-//    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
-    ///AI控制
 }
 
 void ObjectsControl::manage_objects()
 {
-//    QWriteLocker(&data_runtime.lock); //写锁定
+    QWriteLocker locker(&data_runtime.lock); //写锁定
+//    QMutexLocker locker(&data_runtime.mutex);
 
     ///对象派生
     for (int index = 0; index < data_runtime.list_objects.size(); ++index)
@@ -559,36 +554,38 @@ void ObjectsControl::manage_objects()
 
 
     ///场景生成
+    //以下代码写得十分混乱
     Integer size=static_cast<Integer>(data_runtime.scene.rules_generate.size());
 
     if(cooldown>0)
-        --cooldown;
+        --cooldown;//降低冷却
 
-    if(size==data_runtime.index_crt_generate_rule)
+    if(size==data_runtime.index_crt_generate_rule)//完成全部生成规则
         return;
 
     if(cooldown==0)
     {
-
         if(rest==0)
         {
             ++data_runtime.index_crt_generate_rule;//下一条规则
 
             if(size>data_runtime.index_crt_generate_rule)
                 unit=&data_runtime.scene.rules_generate[static_cast<size_t>(data_runtime.index_crt_generate_rule)];
+            else
+                return;
             rest=unit->first.number;
         }
-        else
-            --rest;
+
         //获取当前规则的引用
 
         if(data_runtime.score<unit->first.requirement_score)
             return;
 
-        if(rest!=0||(data_runtime.num_updates>=unit->first.requirement_time))
+        if(rest>=0||(data_runtime.num_updates>=unit->first.requirement_time))
         {
             generate_object(unit->first,unit->second);//生成对象
             cooldown=unit->first.interval;//设置冷却
+            --rest;
         }
     }
 
@@ -596,10 +593,10 @@ void ObjectsControl::manage_objects()
 
 void ObjectsControl::update_property()
 {
+//    QWriteLocker locker(&data_runtime.lock); //写锁定
+    QReadLocker locker(&data_runtime.lock); //读锁定
+//    QMutexLocker locker(&data_runtime.mutex);
 
-//    QReadLocker(&data_runtime.lock); //读锁定
-
-//    QWriteLocker(&data_runtime.lock);
 
     for (auto object : data_runtime.list_objects)
     {
@@ -1062,7 +1059,7 @@ void GameWidget::init_UI()
     ///game页
     auto p =new QOpenGLWidget();
 
-    data_runtime.scene_main->setItemIndexMethod(QGraphicsScene::ItemIndexMethod::BspTreeIndex);//无索引(对于动态元素效果更好)
+    data_runtime.scene_main->setItemIndexMethod(QGraphicsScene::ItemIndexMethod::NoIndex);//设置底层索引
     data_runtime.view_main->setViewport(p);
     data_runtime.view_main->setMouseTracking(true);
 
@@ -1521,9 +1518,9 @@ void GameWidget::update()
 
     info_status_bar.time_consumption=tt;
 
-    info_status_bar.pos_mouse = data_runtime.view_main->pos_mouse;                                //鼠标坐标
-    info_status_bar.num_updates =data_runtime.num_updates;                                       //更新数
-    info_status_bar.num_objects = data_runtime.list_objects.size();                  //对象数量
+    info_status_bar.pos_mouse = data_runtime.view_main->pos_mouse;    //鼠标坐标
+    info_status_bar.num_updates =data_runtime.num_updates;            //更新数
+    info_status_bar.num_objects = data_runtime.list_objects.size();   //对象数量
     data_runtime.pos_mouse_scene = data_runtime.view_main->pos_mouse; //鼠标坐标
 
     emit signal_send_status_bar_info(&this->info_status_bar); //更新状态栏信息
@@ -1535,9 +1532,18 @@ void GameWidget::update()
             mouse_event_not_handled=false;
         try
         {
-            control.process_data();    //数据处理
-            control.manage_objects();  //管理对象
-            control.update_property(); //更新元素属性
+//            emit signal_process_data();  //发送信号, 子线程处理数据
+
+            control.process_data();      //数据处理
+            auto start = std::chrono::steady_clock::now();
+            control.process_collision(); //处理碰撞
+            auto end = std::chrono::steady_clock::now();
+            control.manage_objects();    //管理对象
+            control.update_property();   //更新元素属性
+
+
+            auto tt = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+            qDebug()<<tt;
         }
         catch(const QString &e)
         {
@@ -1564,8 +1570,8 @@ void GameWidget::update()
 
     --cooldown_next_data_update;
 
-    data_runtime.view_main->update(); //视图更新
-//    view_main->viewport()->update();
+//    data_runtime.view_main->update(); //视图更新
+//    data_runtime.view_main->viewport()->update();
 //    view_main->repaint();
     ++data_runtime.num_updates;
 }
@@ -1645,7 +1651,6 @@ void GameWidget::update_bg_image_position()
 
 void GameWidget::push_info(const QString &message)
 {
-    qDebug()<<"asdf";
     this->browser_info->append(message);
     this->browser_info->update();//刷新
 }

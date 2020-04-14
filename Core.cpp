@@ -26,7 +26,7 @@ namespace Settings
     int size_font=30;//字体大小
 
 
-    int radius_blur=30;//模糊半径
+    int radius_blur=25;//模糊半径
     int interval_title=50;//标题页背景刷新间隔(单位ms)
     int period_change_title_bg=600;//更换标题背景图片的周期
     int period_change_speed=500;//更换移动速度的周期
@@ -71,8 +71,8 @@ namespace Settings
     QString path_images="/images/";
     //音效文件
     QString path_sounds="./data/sounds/";
-    //
-    QString path_musics="";
+    //音乐文件
+    QString path_musics="./data/musics/";
 
 }
 
