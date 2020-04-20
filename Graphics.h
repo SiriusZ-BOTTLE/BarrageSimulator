@@ -3,8 +3,10 @@
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
 #include <QMouseEvent>
 #include <QDebug>
+
 
 
 class GraphicsView : public QGraphicsView
@@ -19,6 +21,10 @@ public:
     void mousePressEvent(QMouseEvent *event) override;
 
     void mouseReleaseEvent(QMouseEvent *event) override;
+
+//    void paintEvent(QPaintEvent *event) override;
+
+//    void drawForeground(QPainter *painter, const QRectF &rect) override;
 
 };
 
@@ -35,10 +41,22 @@ public:
 public:
     //绘制背景
     void drawBackground(QPainter *painter, const QRectF &rect) override;
+
+
+};
+
+//背景图对象
+//坑爹得一点是, 多继承要把QObject放在前面(-_-)||
+class GraphicsPixmapItem : public QObject, public QGraphicsPixmapItem
+{
+    Q_OBJECT
+    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity FINAL)//注册一下属性(这个注册真的好难写啊)
+    using QGraphicsPixmapItem::QGraphicsPixmapItem;//使用基类全部构造函数
+
 };
 
 
-
+//QGraphicsObject;
 
 
 #endif // GRAPHICSSCENE_H

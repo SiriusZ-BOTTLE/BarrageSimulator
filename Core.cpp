@@ -10,6 +10,9 @@ namespace Settings
     bool flag_music=false;//音乐开关
     bool flag_sound=false;//音效开关
 
+    Decimal volume_music=1.0;//音乐音量
+    Decimal volume_sound=1.0;//音效音量
+
     int width_interface=500;
     int height_interface=200;
 
@@ -26,11 +29,11 @@ namespace Settings
     int size_font=30;//字体大小
 
 
-    int radius_blur=25;//模糊半径
-    int interval_title=50;//标题页背景刷新间隔(单位ms)
-    int period_change_title_bg=600;//更换标题背景图片的周期
+    int radius_blur=15;//模糊半径
+    int interval_title=300;//标题页背景刷新间隔(单位ms)
+    int period_change_title_bg=100;//更换标题背景图片的周期
     int period_change_speed=500;//更换移动速度的周期
-    Decimal speed_bg_moving=0.8;//背景图轴向最大移动速度
+    Decimal speed_bg_moving=1.0;//背景图最大移动速度
 
     Decimal distance_mutex=1;//互斥距离(单位: 像素)
 
@@ -73,6 +76,10 @@ namespace Settings
     QString path_sounds="./data/sounds/";
     //音乐文件
     QString path_musics="./data/musics/";
+
+    QString file_sound_button_hover="button_hover.wav";
+
+    QString file_sound_button_click="button_click.wav";
 
 }
 
@@ -298,9 +305,7 @@ void RunTimeData::clear()
 
     //析构全部对象
     for(auto p_object:this->list_objects)
-    {
         delete p_object;
-    }
     list_objects.clear();//清空列表
     this->p1=this->p2=nullptr;
 
@@ -308,6 +313,8 @@ void RunTimeData::clear()
     this->scene.clear();//场景清空
     this->score=0;//重置分数
     this->num_updates=0;
+
+    this->view_main->update();//刷新
     index_crt_generate_rule=-1;
 }
 

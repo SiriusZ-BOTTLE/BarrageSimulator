@@ -2,9 +2,9 @@
     "name":"TestScene",
     "description":"测试场景",
     "name_resource":"default",
-    "image_internal":"063_R.png",
+    "image_internal":"title_BG_1.png",
     "image_external":"image_outside_border.png",
-    "size":[2000,1326],
+    "size":[500,500],
     "pos_view":[0,0],
     "pos_initial":[0,0],
     "rules_generate":
@@ -30,10 +30,10 @@
             {
                 "flag_in_viewport":false,
                 "position":[-1.0,-1.0],
-                "requirement_time":0,
+                "requirement_time":50,
                 "requirement_score":0,
-                "number":400,
-                "interval":0,
+                "number":1,
+                "interval":5,
                 "name_object":"block_zero_red",
                 "rotation":-1
             },

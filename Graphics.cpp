@@ -21,6 +21,7 @@ void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
 }
 
 
+
 ///绘制背景
 void GraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
@@ -42,8 +43,8 @@ void GraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 
         painter->setBrush(brush_internal);
         painter->drawRect(intersection);
-
     }
+
 //    QBrush brush;
 //    brush.setColor(QColor(0xcc,0xcc,0xcc));
 //    painter->drawRect(rect_scene);

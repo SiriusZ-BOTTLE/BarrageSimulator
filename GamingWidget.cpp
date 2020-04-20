@@ -601,7 +601,7 @@ void ObjectsControl::update_property()
     for (auto object : data_runtime.list_objects)
     {
         object->item->setPos(object->property.coordinate.first, object->property.coordinate.second); //更新位置
-        object->item->setRotation(object->property.rotation.first);                                  //更新角度
+        object->item->setRotation(object->property.rotation.first);                                  //更新角
 
         Element* p = static_cast<Element*>(object->item);//下一帧
         if(p->number_frame>1)
@@ -840,21 +840,30 @@ void ObjectsControl::generate_object(const SceneGenerateRule &rule, const Object
 GameWidget::GameWidget(MainWindow *_main_window)
     : QWidget(), main_window(_main_window)
 {
-    init_components();
-    init_UI();
-    init_threads();
-    init_signal_slots();
+    ///创建线程对象
+    object_thread_audio_control=new AudiosControl();      //new一个线程对象
+    object_thread_objects_control = new ObjectsControl(); //new一个线程对象
 
     load_title_images();//加载标题背景图片
+    load_audio_files();//加载音频文件
+
+    init_threads();//初始化线程
+
+    init_components();//初始化组件(new)
+    init_UI();//初始化UI
+    init_signal_slots();//初始化信号槽(不包含线程信号槽)
+
+    init_animation();//初始化动画
 }
 
 GameWidget::~GameWidget()
 {
 
-    thread_data_process.quit(); //退出线程
-//    thread_objects_management.quit();
-    thread_data_process.wait(); //等待线程结束
-//    thread_objects_management.wait();
+    thread_object_control.quit(); //退出线程
+    thread_audio_control.quit();//退出线程
+    thread_object_control.wait(); //等待线程结束
+    thread_audio_control.wait();//等待线程结束
+
     this->reset();//重置
 }
 
@@ -916,11 +925,20 @@ void GameWidget::init_components()
 
 void GameWidget::init_UI()
 {
+    ///主窗口
+    this->setWindowTitle("BarrageSimulator - Particles");
+    this->setObjectName("top");
+    this->setMinimumSize(Settings::width_gaming,Settings::height_gaming);
+
+    layout_main->setContentsMargins(0,0,0,0);
+    layout_main->addWidget(widget_main);
+    this->setLayout(layout_main);
 
     ///总体样式
     this->setStyleSheet(
         //全部
         "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; }"
+        "QWidget#top { background-color:#ffffff; }"
         //暂停菜单
         "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
         "QWidget#widget_game_info { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
@@ -943,31 +961,26 @@ void GameWidget::init_UI()
         "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; padding:10px; }"
     );
 
-
-    ///主窗口
-    this->setWindowTitle("BarrageSimulator - Particles");
-
-    this->setMinimumSize(Settings::width_gaming,Settings::height_gaming);
-
-    this->setLayout(layout_main);
-    layout_main->setContentsMargins(0,0,0,0);
-
-    layout_main->addWidget(widget_main);
-
-
     ///标题页
     widget_title->setLayout(layout_title);//设置布局
     layout_title->setContentsMargins(0,0,0,0);
 
-
     //模糊效果
-    effect_blur.setBlurRadius(Settings::radius_blur);
-    effect_blur.setBlurHints(QGraphicsBlurEffect::BlurHint::PerformanceHint);
-    bg.setGraphicsEffect(&effect_blur);
+//    effect_blur.setBlurRadius(Settings::radius_blur);
+//    effect_blur.setBlurHints(QGraphicsBlurEffect::BlurHint::PerformanceHint);
+//    bg.setGraphicsEffect(&effect_blur);
+//    bg.setOpacity(0.1);
 
-    auto widget_OGL =new QOpenGLWidget();
+    scene_title->addItem(&bg);//添加到背景场景
 
-    view_title->setViewport(widget_OGL);
+    scene_title->brush_internal.setColor(QColor(0,0,255));
+
+//    QOpenGLWidget* widget_OGL =new QOpenGLWidget();
+//    QSurfaceFormat format;
+//    format.setAlphaBufferSize(1000000);
+//    widget_OGL->setFormat(format);
+//    view_title->setViewport(widget_OGL);
+//    view_title->setRenderHints(QPainter::SmoothPixmapTransform|QPainter::Antialiasing);
 //    view_title->setGraphicsEffect(&effect_blur);
 
     view_title->setSceneRect(0,0,view_title->width(),view_title->height());
@@ -976,9 +989,6 @@ void GameWidget::init_UI()
     view_title->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);   //垂直
     view_title->setParent(this);
     view_title->lower();
-
-    view_title->setCacheMode(QGraphicsView::CacheBackground);
-//    view_title->setRenderHints(QPainter::Antialiasing);//抗锯齿
 
     label_title->setPixmap(QPixmap(Settings::path_title_image));
 
@@ -1063,6 +1073,8 @@ void GameWidget::init_UI()
     data_runtime.view_main->setViewport(p);
     data_runtime.view_main->setMouseTracking(true);
 
+    data_runtime.view_main->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+
     data_runtime.view_main->setContentsMargins(0,0,0,0);
     data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width(),data_runtime.view_main->height());
 
@@ -1096,6 +1108,8 @@ void GameWidget::init_UI()
     widget_menu->raise();           //置于顶层
     widget_menu->setObjectName("widget_menu");
 
+    qDebug()<<widget_menu->windowOpacity();
+
     ///game_info页
     widget_game_info->setLayout(layout_widget_game_info);
 
@@ -1128,6 +1142,90 @@ void GameWidget::init_UI()
     widget_main->setCurrentIndex(0);
 }
 
+void GameWidget::init_animation()
+{
+    animation_menu_show_opacity=new QPropertyAnimation();
+    animation_menu_close_opacity=new QPropertyAnimation();
+    animation_menu_show_motion=new QPropertyAnimation();
+    animation_menu_close_motion=new QPropertyAnimation();
+    animation_transition=new QPropertyAnimation();
+    animation_bg_fade_in=new QPropertyAnimation();
+    animation_bg_fade_out=new QPropertyAnimation();
+
+    group_animation_menu_show=new QParallelAnimationGroup();
+    group_animation_menu_close=new QParallelAnimationGroup();
+
+    effect_opacity_menu=new QGraphicsOpacityEffect();
+    effect_opacity_main=new QGraphicsOpacityEffect();
+
+    widget_menu->setGraphicsEffect(effect_opacity_menu);//设置透明效果
+
+    //menu页淡入
+    animation_menu_show_opacity->setPropertyName("opacity");
+    animation_menu_show_opacity->setDuration(150);
+    animation_menu_show_opacity->setTargetObject(effect_opacity_menu);
+    animation_menu_show_opacity->setKeyValueAt(0,0.0);
+    animation_menu_show_opacity->setKeyValueAt(1,1.0);
+
+    //menu页淡出
+    animation_menu_close_opacity->setPropertyName("opacity");
+    animation_menu_close_opacity->setDuration(100);
+    animation_menu_close_opacity->setTargetObject(effect_opacity_menu);
+    animation_menu_close_opacity->setKeyValueAt(0,1.0);
+    animation_menu_close_opacity->setKeyValueAt(1,0.0);
+
+    //menu页移入
+    animation_menu_show_motion->setPropertyName("pos");
+    animation_menu_show_motion->setDuration(150);
+    animation_menu_show_motion->setTargetObject(widget_menu);
+    animation_menu_show_motion->setKeyValueAt(0,QPoint(-100,0));
+    animation_menu_show_motion->setKeyValueAt(1,QPoint(0,0));
+
+    //menu页移出
+    animation_menu_close_motion->setPropertyName("pos");
+    animation_menu_close_motion->setDuration(100);
+    animation_menu_close_motion->setTargetObject(widget_menu);
+    animation_menu_close_motion->setKeyValueAt(0,QPoint(0,0));
+    animation_menu_close_motion->setKeyValueAt(1,QPoint(-100,0));
+
+
+    connect(group_animation_menu_close,&QParallelAnimationGroup::finished,widget_menu,&QWidget::hide);
+
+    group_animation_menu_show->addAnimation(animation_menu_show_opacity);
+    group_animation_menu_show->addAnimation(animation_menu_show_motion);
+
+    group_animation_menu_close->addAnimation(animation_menu_close_opacity);
+    group_animation_menu_close->addAnimation(animation_menu_close_motion);
+
+    effect_opacity_main->setOpacity(1.0);
+    widget_main->setGraphicsEffect(effect_opacity_main);//设置透明效果
+
+    //widget_main切换效果
+    animation_transition->setPropertyName("opacity");
+    animation_transition->setTargetObject(effect_opacity_main);
+    animation_transition->setDuration(100);
+    animation_transition->setKeyValueAt(0,0.0);
+    animation_transition->setKeyValueAt(1,1.0);
+
+    //背景图淡入
+    animation_bg_fade_in->setPropertyName("opacity");
+    animation_bg_fade_in->setDuration(500);
+    animation_bg_fade_in->setTargetObject(&bg);
+    animation_bg_fade_in->setKeyValueAt(0,0.0);
+    animation_bg_fade_in->setKeyValueAt(1,1.0);
+
+    //背景图淡出
+    animation_bg_fade_out->setPropertyName("opacity");
+    animation_bg_fade_out->setDuration(500);
+    animation_bg_fade_out->setTargetObject(&bg);
+    animation_bg_fade_out->setKeyValueAt(0,1.0);
+    animation_bg_fade_out->setKeyValueAt(1,0.0);
+
+    connect(animation_bg_fade_out,&QPropertyAnimation::finished,this,&GameWidget::update_bg_image_position);
+//    connect(animation_bg_fade_out,&QPropertyAnimation::finished,&timer_title,static_cast<void (QTimer::*)()>(&QTimer::start));
+
+}
+
 void GameWidget::init_signal_slots()
 {
     //定时器更新信号
@@ -1135,7 +1233,7 @@ void GameWidget::init_signal_slots()
     connect(&timer_title, &QTimer::timeout, this, &GameWidget::update_bg_image_position);
 
     //消息推送
-    connect(object_thread_data_process, &ObjectsControl::signal_push_info, this, &GameWidget::push_info);
+    connect(object_thread_objects_control, &ObjectsControl::signal_push_info, this, &GameWidget::push_info);
     connect(this, &GameWidget::signal_push_info, main_window, &MainWindow::push_info);
     connect(this, &GameWidget::signal_push_info, this, &GameWidget::push_info);
 
@@ -1156,26 +1254,26 @@ void GameWidget::init_signal_slots()
 
 void GameWidget::init_threads()
 {
-    object_thread_data_process = new ObjectsControl();              //new一个线程对象
-    object_thread_data_process->moveToThread(&thread_data_process); //转移至线程
-    thread_data_process.start();                                    //开启线程
+    object_thread_objects_control->moveToThread(&thread_object_control); //转移至线程
+    thread_object_control.start();                                    //开启线程
 
-    //    object_thread_objects_management = new ObjectsControl();                    //new一个线程对象
-    //    object_thread_objects_management->moveToThread(&thread_objects_management); //转移至线程
-    //    thread_objects_management.start();                                          //开启线程
+    object_thread_audio_control->moveToThread(&thread_audio_control);
+    thread_audio_control.start();
+
 
     ///连接线程信号
 
     //线程中的对象稍后释放
-    connect(&thread_data_process, &QThread::finished, object_thread_data_process, &QObject::deleteLater);
-    //    connect(&thread_objects_management, &QThread::finished, object_thread_objects_management, &QObject::deleteLater);
+    connect(&thread_object_control, &QThread::finished, object_thread_objects_control, &QObject::deleteLater);
+    connect(&thread_audio_control, &QThread::finished, object_thread_audio_control, &QObject::deleteLater);
     //耗时操作
-    connect(this, &GameWidget::signal_process_data, object_thread_data_process, &ObjectsControl::process_data);
-    //    connect(this, &GamingWidget::signal_manage_objects, object_thread_objects_management, &ObjectsControl::manage_objects);
+    connect(this, &GameWidget::signal_process_data, object_thread_objects_control, &ObjectsControl::process_data);
+
 }
 
 void GameWidget::load_title_images()
 {
+    emit signal_push_info("<function called> GameWidget::load_title_images()");
     QDir dir(Settings::path_dir_title_bg);
     QStringList filter{"*.png","*.jpg"};
     QFileInfoList infos=dir.entryInfoList(filter,QDir::Files|QDir::Readable,QDir::Name);
@@ -1200,11 +1298,12 @@ void GameWidget::load_title_images()
     timer_title.setInterval(Settings::interval_title);
 //    timer_title.start();
 
-    scene_title->addItem(&bg);//添加到场景
 }
 
 void GameWidget::load_audio_files()
 {
+    emit signal_push_info("<function called> GameWidget::load_audio_files()");
+
     QDir dir(Settings::path_sounds);
     QStringList filter{"*.wav"};
 
@@ -1217,17 +1316,28 @@ void GameWidget::load_audio_files()
         return;
     }
 
-    QSoundEffect effect;
+    decltype (object_thread_audio_control->sound_effects.end()) iter;
 
     //读取全部音频文件并放入容器
     for(QFileInfo info:infos)
     {
-        effect.setSource(info.filePath());
-        sound_effects.insert(info.fileName(),effect);//添加到容器
+        //原地构造并获取迭代器
+        iter=object_thread_audio_control->sound_effects.emplace(info.fileName(),object_thread_audio_control).first;
+
+        iter->second.setSource(QUrl::fromLocalFile(info.filePath()));
+        iter->second.setVolume(Settings::volume_sound);
     }
 
-//    if(sound_effects.find(Settings:))
 
+    if((iter=object_thread_audio_control->sound_effects.find(Settings::file_sound_button_hover))!=object_thread_audio_control->sound_effects.end())
+        Button::set_hover_sound(&(iter->second));//设置音效
+    else
+        emit signal_push_info("<WARN> No sound files found of name:"+Settings::file_sound_button_hover);
+
+    if((iter=object_thread_audio_control->sound_effects.find(Settings::file_sound_button_click))!=object_thread_audio_control->sound_effects.end())
+        Button::set_click_sound(&(iter->second));//设置音效
+    else
+        emit signal_push_info("<WARN> No sound files found of name:"+Settings::file_sound_button_click);
 
 }
 
@@ -1346,6 +1456,7 @@ void GameWidget::key_process()
 
 void GameWidget::esc()
 {
+    emit signal_push_info(QString::asprintf("<function called> GameWidget::esc()"));
     static bool active = false;
 
     if (active) //当前处于暂停状态
@@ -1356,7 +1467,8 @@ void GameWidget::esc()
             this->status=Status::Running;//状态设为运行(继续运行)
         }
 
-        this->widget_menu->setVisible(false);
+//        animation_menu_close_opacity.start();
+        group_animation_menu_close->start();
     }
     else
     {
@@ -1366,7 +1478,9 @@ void GameWidget::esc()
             this->status=Status::Pause;//状态设为暂停
         }
         this->widget_menu->setVisible(true);
+        group_animation_menu_show->start();
     }
+
     active = !active;
 }
 
@@ -1375,6 +1489,8 @@ void GameWidget::goto_page(GameWidget::Page page)
     emit signal_push_info(QString::asprintf("<function called> GameWidget::goto_page(%d)",page));
     page_last=static_cast<Page>(widget_main->currentIndex());
     widget_main->setCurrentIndex(page);
+    if(page!=GamePage)
+        animation_transition->start();
 }
 
 void GameWidget::clear()
@@ -1415,13 +1531,17 @@ void GameWidget::load_scene()
             data_runtime.scene_main->brush_external.setTexture(data_runtime.pkg.pixmaps[data_runtime.scene.image_external]);
         }
 
-        goto_page(GamePage);
+
 
         this->view_title->setVisible(false);
         this->timer_title.stop();//关闭主界面
         this->status=Status::Running;
         this->timer.start(Settings::interval);
         this->widget_game_info->setVisible(true);
+
+        data_runtime.view_main->update();
+
+        goto_page(GamePage);
     }
     catch (const QString &e)
     {
@@ -1464,7 +1584,6 @@ void GameWidget::initialize()
 {
     timer.setTimerType(Qt::TimerType::PreciseTimer);//精密计时器
     timer.start(Settings::interval); //开启定时器
-
 }
 
 void GameWidget::reset()
@@ -1475,6 +1594,7 @@ void GameWidget::reset()
     timer_title.start();
     this->view_title->setVisible(true);
     this->clear();
+
     goto_start_page();
     control.reset();
     this->cooldown_next_data_update=0;
@@ -1482,8 +1602,8 @@ void GameWidget::reset()
 
 void GameWidget::start()
 {
-    this->show();
-    this->timer_title.start();//标题更新计时器开启
+    this->show();//显示
+    update_bg_image_position();
     Settings::reset_key_map();//重置键位
 }
 
@@ -1496,6 +1616,7 @@ void GameWidget::exec()
 
 void GameWidget::test()
 {
+    ///测试用函数
 //    data_runtime.p1 = new FlyingObject(objects_inner[InnerObjects::Block_zero_blue]);
 //    data_runtime.p1->property.coordinate = {100, 100};
 //    data_runtime.p1->add_to_scene(scene_main);    //添加到场景
@@ -1516,17 +1637,68 @@ void GameWidget::test()
 
 
 
-    try
-    {
-        ResourcePackage pkg;
-        pkg.set_package_path("./data/resources/default");
-        pkg.load();//加载包
-    }
-    catch (const QString & e)
-    {
-        qDebug()<<e;
-    }
+//    try
+//    {
+//        ResourcePackage pkg;
+//        pkg.set_package_path("./data/resources/default");
+//        pkg.load();//加载包
+//    }
+//    catch (const QString & e)
+//    {
+//        qDebug()<<e;
+//    }
 
+//    QCoreApplication::applicationDirPath();
+
+//    QString path=/*QCoreApplication::applicationDirPath()+*/"./data/sounds/button_click.wav";
+
+////    QApplication::beep();//蜂鸣
+
+//    qDebug()<<path;
+
+//    static QSoundEffect e;
+//    static QSound s(path);
+//    e.setSource(QUrl::fromLocalFile(path));
+//    qDebug()<<e.isLoaded();
+//    qDebug()<<s.fileName();
+
+//    static bool first=true;
+
+//    if(first)
+//    {
+//        first=false;
+//    }
+//    else
+//    {
+//        e.play();
+//        s.play();
+//    }
+//    QSound::play(path);
+
+//    QFile inputFile;
+//    inputFile.setFileName("./data/sounds/button_hover.wav");
+//    inputFile.open(QIODevice::ReadOnly);
+
+//    //设置采样格式
+//    QAudioFormat audioFormat;
+//    //设置采样率
+//    audioFormat.setSampleRate(44100);
+//    //设置通道数
+//    audioFormat.setChannelCount(2);
+//    //设置采样大小，一般为8位或16位
+//    audioFormat.setSampleSize(16);
+//    //设置编码方式
+//    audioFormat.setCodec("audio/pcm");
+//    //设置字节序
+//    audioFormat.setByteOrder(QAudioFormat::LittleEndian);
+//    //设置样本数据类型
+//    audioFormat.setSampleType(QAudioFormat::UnSignedInt);
+
+//    QAudioOutput *audio = new QAudioOutput( audioFormat, nullptr);
+//    audio->start(&inputFile);
+
+//    this->widget_menu->setWindowOpacity(0.5);
+    animation_menu_show_opacity->start();
 
 }
 
@@ -1665,16 +1837,24 @@ void GameWidget::update_bg_image_position()
 
     if(count%Settings::period_change_title_bg==0)//更换图片
     {
+        if(timer_title.isActive())
+        {
+            timer_title.stop();//停止计时器
+            animation_bg_fade_out->start();//淡出
+            return;
+        }
+        else
+            timer_title.start();//继续
+
         ++index_crt;
         index_crt%=size;
         this->bg.setPixmap(images_title[index_crt]);
         size_pixmap_crt=images_title[index_crt].size();
         bg.setOffset(-size_pixmap_crt.rwidth()/2, -size_pixmap_crt.rheight()/2);//设置中心偏移
-
         bg.setPos(0,0);//置于中心
+
+        animation_bg_fade_in->start();//淡入
     }
-
-
     ++count;
 }
 
@@ -1710,6 +1890,7 @@ void GameWidget::close_log_page()
 
 void GameWidget::exit()
 {
+    emit signal_push_info("<function called> GameWidget::exit()");
     Page page_crt=static_cast<Page>(widget_main->currentIndex());
 
     switch(page_crt)
@@ -1745,7 +1926,7 @@ void GameWidget::exit()
 
 void GameWidget::game_over()
 {
-
+    emit signal_push_info("<function called> GameWidget::game_over()");
 }
 
 
@@ -1812,7 +1993,7 @@ void GameWidget::mouseReleaseEvent(QMouseEvent *event)
 void GameWidget::resizeEvent(QResizeEvent *event)
 {
     this->view_title->resize(event->size());
-    this->widget_menu->resize(event->size());
+    this->widget_menu->resize(event->size().width()*2,event->size().height());
     this->widget_game_info->resize(event->size());
 
 //    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width()-1,data_runtime.view_main->height()-1);

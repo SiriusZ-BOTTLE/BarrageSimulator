@@ -14,8 +14,6 @@ using namespace InnerData;
 ///全局变量, 线程共享
 //运行时数据(包括场景中的所有对象, 按键状态等信息)
 extern RunTimeData data_runtime;
-//extern GraphicsScene * scene_main;//主场景
-//extern GraphicsView * view_main;//视图
 
 //前导声明
 class MainWindow;
@@ -76,6 +74,13 @@ signals:
 
 };
 
+class AudiosControl: public QObject
+{
+    Q_OBJECT
+public:
+    std::map<QString, QSoundEffect> sound_effects{};
+};
+
 ///主组件
 class GameWidget : public QWidget
 {
@@ -109,11 +114,13 @@ public:
     QWidget * widget_title{nullptr};//title页
     QWidget * widget_start{nullptr};//start页
     QWidget * widget_log{nullptr};//log页
+    QWidget * widget_option{nullptr};//option页
     QWidget * widget_menu{nullptr};//pause页
 
     QWidget * panel_log{nullptr};//log页面板
     QWidget * panel_start{nullptr};//start页面板
     QWidget * panel_title{nullptr};//title页面板
+    QWidget * panel_option{nullptr};//option页面板
 
     QWidget * widget_game_info{nullptr};//游戏信息覆盖面板
     QWidget * panel_game_over{nullptr};//游戏结束面板
@@ -132,7 +139,7 @@ public:
 
     GraphicsScene * scene_title{nullptr};//标题页背景场景
     GraphicsView * view_title{nullptr};//标题页背景视图
-    QGraphicsPixmapItem bg;//图片项
+    GraphicsPixmapItem bg;//图片项
 
     QListWidget *list_widget_start{nullptr};//start页列表组件
     QItemSelectionModel *model_selection{nullptr};//选择集模型
@@ -171,11 +178,12 @@ public:
     ObjectsControl control{};
 
     ///线程对象
-    ObjectsControl * object_thread_data_process{nullptr};
-//    ObjectsControl * object_thread_objects_management{nullptr};//废弃, 不使用
+    ObjectsControl * object_thread_objects_control{nullptr};
+    AudiosControl * object_thread_audio_control{nullptr};
 
     //线程
-    QThread thread_data_process{};//数据处理线程
+    QThread thread_object_control{};//数据处理线程
+    QThread thread_audio_control{};//音频播放线程
 //    QThread thread_objects_management{};//对象管理线程
 
     ///定时器
@@ -188,20 +196,35 @@ public:
     QVector<QPixmap> images_title{};
 
     ///音效集合
-    QMap<QString, QSoundEffect> sound_effects{};
+//    std::map<QString, QSoundEffect> sound_effects{};
+//    std::map<QString, QSound> sound_effects{};
 
-    //速度
+    //背景图片移动速度
     BinaryVector<Decimal> speed_bg_moving{0,0};
-
+    //模糊特效
     QGraphicsBlurEffect effect_blur;
-
     //场景文件列表
     QStringList path_scene_files{};
-
     //指向控制台widget
     MainWindow * main_window{nullptr};
 
-    int mouse_delay{0};//鼠标延迟
+    ///动画
+    QPropertyAnimation * animation_menu_show_opacity{};//菜单页透明度动画
+    QPropertyAnimation * animation_menu_close_opacity{};//菜单页透明度动画
+    QPropertyAnimation * animation_menu_show_motion{};//菜单页运动动画
+    QPropertyAnimation * animation_menu_close_motion{};//菜单页运动动画
+    QPropertyAnimation * animation_transition{};//过渡动画
+    QPropertyAnimation * animation_bg_fade_in{};//背景淡入动画
+    QPropertyAnimation * animation_bg_fade_out{};//背景淡出动画
+
+    QParallelAnimationGroup * group_animation_menu_show{};//菜单页显示动画组
+    QParallelAnimationGroup * group_animation_menu_close{};//菜单页关闭动画组
+
+    QGraphicsOpacityEffect * effect_opacity_menu{};//菜单页透明效果
+    QGraphicsOpacityEffect * effect_opacity_bg{};//背景透明效果
+    QGraphicsOpacityEffect * effect_opacity_main{};//widget_main透明效果
+
+    int mouse_delay{0};//鼠标延迟()废弃
 
     bool mouse_event_not_handled;//未处理鼠标事件
 
@@ -217,6 +240,8 @@ private:
     void init_components();
     //初始化界面
     void init_UI();
+    //初始化动画
+    void init_animation();
     //初始化信号槽
     void init_signal_slots();
     //初始化线程

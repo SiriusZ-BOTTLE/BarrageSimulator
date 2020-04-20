@@ -6,13 +6,13 @@
     "center":[16,16],
     "property":
     {
-        "lifetime":500,
+        "lifetime":200,
         "channel_collision":2,
         "flag_delete_outside_scene":false,
         "flag_boundary_restriction":false,
         "flag_collision":true,
         "flag_channel_collision":false,
-        "number_rest_collision":10,
+        "number_rest_collision":1,
         "rule":-1,
         "rule_on_collision":-1,
         "rule_on_destroy":1,
@@ -33,10 +33,10 @@
     "property_game":
     {
         "flag_team_kill":false,
-        "team":2,
+        "team":1,
         "score":0,
         "endurance":[100,100],
-        "damage":10,
+        "damage":50,
         "resist":100,
         "penetrability":5
     }

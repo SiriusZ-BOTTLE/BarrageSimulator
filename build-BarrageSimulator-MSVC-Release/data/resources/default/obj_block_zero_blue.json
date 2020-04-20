@@ -22,7 +22,7 @@
         "inertia_rotational":10.0,
         "elasticity":1.0,
         "mode_movement":"Stop",
-        "velocity_max":30,
+        "velocity_max":15,
         "acceleration_max":1.0,
         "attenuation_velocity":1.0,
         "mode_rotation":"TowardsMouse",

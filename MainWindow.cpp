@@ -95,6 +95,7 @@ void MainWindow::init_UI()
         "QWidget > QStatusBar > QLabel { font-family:consolas; font-style: bold }"
         "QWidget > QTextBrowser { color:#EEEEEE; background-color:#000000; }"
     );
+
 }
 
 void MainWindow::init_signal_slots()
@@ -119,7 +120,7 @@ void MainWindow::closeEvent(QCloseEvent * event)
 
 void MainWindow::push_info(const QString &message)
 {
-    qDebug()<<"push_info()";
+//    qDebug()<<"push_info()";
     static long long count;
     //推送消息
     this->text_browser->append(message);

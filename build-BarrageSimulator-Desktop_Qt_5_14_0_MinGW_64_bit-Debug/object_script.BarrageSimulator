@@ -1,10 +1,11 @@
 Button.o
 Core.o
 GamingWidget.o
-GraphicsView.o
+Graphics.o
 InnerData.o
 main.o
 MainWindow.o
-qrc_InternalMaterials.o
+moc_Button.o
 moc_GamingWidget.o
+moc_Graphics.o
 moc_MainWindow.o

@@ -20,8 +20,14 @@
 #include <QListWidget>
 #include <QTextBrowser>
 
+#include <QParallelAnimationGroup>//并行动画组
+#include <QPropertyAnimation>//属性动画
+
+//音频相关
 #include <QSound>
 #include <QSoundEffect>
+#include <QAudioFormat>
+#include <QAudioOutput>
 
 #include <QMetaType>
 #include <QLabel>
