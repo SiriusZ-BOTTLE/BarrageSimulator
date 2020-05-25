@@ -290,6 +290,11 @@ void Core::Objects::FlyingObject::initialize()
     this->property.initialize();//初始化属性
 }
 
+Element &FlyingObject::element_reference()
+{
+    return *static_cast<Element *>(item);
+}
+
 
 
 

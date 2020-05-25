@@ -774,39 +774,51 @@ void ObjectsControl::generate_object(const SceneGenerateRule &rule, const Object
         //随机横坐标
         obj_new->property.coordinate.first=ToolFunctionsKit::get_random_decimal_0_1()*data_runtime.scene_main->width();
 
+        QRectF rect_exposed= data_runtime.scene_main->rect_exposed;
+        Decimal &edge=obj_target.element_reference().edge;
+        rect_exposed.adjust(-edge,-edge,edge,edge);
+
         //随机纵坐标
         if(!rule.flag_in_viewport
-                &&obj_new->property.coordinate.first>data_runtime.scene_main->rect_exposed.left()
-                &&obj_new->property.coordinate.first<data_runtime.scene_main->rect_exposed.right())//视图内不可放置
+                &&obj_new->property.coordinate.first>rect_exposed.left()
+                &&obj_new->property.coordinate.first<rect_exposed.right())//视图内不可放置
         {
+
+//            qDebug()<<rect_exposed;
+
             //纵坐标可能在视图内
-            if(data_runtime.scene_main->rect_exposed.top()<0)//顶部无间隙
+            if(rect_exposed.top()<0)//顶部无间隙
             {
+//                qDebug()<<"顶部无间隙";
                 obj_new->property.coordinate.second=
                         ToolFunctionsKit::get_random_decimal_0_1()
-                        *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.bottom())
-                        +data_runtime.scene_main->rect_exposed.bottom();
+                        *(data_runtime.scene_main->height()-rect_exposed.bottom())
+                        +rect_exposed.bottom();
             }
-            else if(data_runtime.scene_main->rect_exposed.bottom()>data_runtime.scene_main->height())//底部无间隙
+            else if(rect_exposed.bottom()>data_runtime.scene_main->height())//底部无间隙
             {
+//                qDebug()<<"底部无间隙";
                 obj_new->property.coordinate.second=
                         ToolFunctionsKit::get_random_decimal_0_1()
-                        *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.top());
+                        *(data_runtime.scene_main->height()-rect_exposed.top());
             }
             else//上下都有间隙
             {
+//                qDebug()<<"上下都有间隙";
+//                qDebug()<<data_runtime.scene_main->rect_exposed.top();
+                ///BUG
                 if(ToolFunctionsKit::get_random_decimal_0_1()<0.5)//选择上间隙
                 {
                     obj_new->property.coordinate.second=
                             ToolFunctionsKit::get_random_decimal_0_1()
-                            *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.top());
+                            *(rect_exposed.top());
                 }
                 else//选择下间隙
                 {
                     obj_new->property.coordinate.second=
                             ToolFunctionsKit::get_random_decimal_0_1()
-                            *(data_runtime.scene_main->height()-data_runtime.scene_main->rect_exposed.bottom())
-                            +data_runtime.scene_main->rect_exposed.bottom();
+                            *(data_runtime.scene_main->height()-rect_exposed.bottom())
+                            +rect_exposed.bottom();
                 }
 
             }
@@ -937,19 +949,20 @@ void GameWidget::init_UI()
     ///总体样式
     this->setStyleSheet(
         //全部
-        "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; }"
+        "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; border-radius:6px; }"
         "QWidget#top { background-color:#ffffff; }"
         //暂停菜单
         "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
-        "QWidget#widget_game_info { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
-        "QWidget#widget_game_info > QLabel { font-size: 30px; background-color: rgba(0,0,0,0.9); }"
+        //顶层信息面板
+        "QWidget#widget_game_info { font-size: 30px; border: 3px solid #00ff00; background-color: rgba(0,0,0,0.9); padding:5px; }"
+        "QWidget#widget_game_info > * { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
         //面板
         "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
         //按钮
-        "QPushButton { background-color: rgba(0,0,0,1.0); color: #ffffff; border: 2px solid #00ff00; width: 200px; height:50px; }"
+        "QPushButton { background-color: rgba(0,0,0,0.6); color: #ffffff; border: 2px solid #00ff00; width: 200px; height:50px; }"
         "QWidget:disabled { background-color: rgba(0,0,0,0.0); color: #999999; border: 2px solid #000000; }"
         //按钮hover
-        "QPushButton::hover{ background-color: rgba(200,200,200,1.0); border: 2px solid #000000; }"
+        "QPushButton::hover{ color:#000000; background-color: rgba(200,200,200,0.9); border: 2px solid #000000; }"
         //面板下
         "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
         "QWidget#panel > QListWidget::item { border: 2px rgba(0,0,0,0.0); border-bottom: 2px solid #555555; margin: 10px; padding: 10px; }"
@@ -1112,9 +1125,10 @@ void GameWidget::init_UI()
 
     ///game_info页
     widget_game_info->setLayout(layout_widget_game_info);
+    widget_game_info->setGeometry(5,5,240,100);
 
-    layout_widget_game_info->setSpacing(0);
 
+    layout_widget_game_info->setSpacing(10);
 
     layout_widget_game_info->addWidget(label_game_info,0,0,Qt::AlignLeft);
     layout_widget_game_info->addWidget(panel_game_over,2,0,1,4,Qt::AlignCenter);
@@ -1130,6 +1144,8 @@ void GameWidget::init_UI()
     widget_game_info->setParent(this);
     widget_game_info->raise();
     widget_game_info->setObjectName("widget_game_info");
+
+
 
 
     //各种组件的尺寸初始设置
@@ -1465,17 +1481,19 @@ void GameWidget::esc()
         {
             this->timer.start(); //开启计时器
             this->status=Status::Running;//状态设为运行(继续运行)
+            widget_game_info->show();//隐藏
         }
 
 //        animation_menu_close_opacity.start();
         group_animation_menu_close->start();
     }
-    else
+    else//当前处于活跃状态
     {
         if(this->widget_main->currentIndex()==GamePage)
         {
             this->timer.stop(); //停止计时器
             this->status=Status::Pause;//状态设为暂停
+            widget_game_info->hide();//隐藏
         }
         this->widget_menu->setVisible(true);
         group_animation_menu_show->start();
@@ -1491,6 +1509,11 @@ void GameWidget::goto_page(GameWidget::Page page)
     widget_main->setCurrentIndex(page);
     if(page!=GamePage)
         animation_transition->start();
+    else
+    {
+        timer_title.stop();
+        this->view_title->setVisible(false);
+    }
 }
 
 void GameWidget::clear()
@@ -1533,8 +1556,8 @@ void GameWidget::load_scene()
 
 
 
-        this->view_title->setVisible(false);
-        this->timer_title.stop();//关闭主界面
+//        this->view_title->setVisible(false);
+//        this->timer_title.stop();//关闭主界面
         this->status=Status::Running;
         this->timer.start(Settings::interval);
         this->widget_game_info->setVisible(true);
@@ -1742,9 +1765,8 @@ void GameWidget::update()
             control.manage_objects();    //管理对象
             control.update_property();   //更新元素属性
 
-
-            auto tt = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
-            qDebug()<<tt;
+//            auto tt = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+//            qDebug()<<tt;
         }
         catch(const QString &e)
         {
@@ -1877,7 +1899,14 @@ void GameWidget::goto_title_page()
 
 void GameWidget::goto_log_page()
 {
+    if(!timer_title.isActive())
+    {
+        timer_title.start();//继续定时器
+        this->view_title->setVisible(true);
+    }
+
     this->button_to_info_page_pause_menu->setEnabled(false);//不可用
+
     this->goto_page(LogPage);
     esc();
 }
@@ -1994,7 +2023,6 @@ void GameWidget::resizeEvent(QResizeEvent *event)
 {
     this->view_title->resize(event->size());
     this->widget_menu->resize(event->size().width()*2,event->size().height());
-    this->widget_game_info->resize(event->size());
 
 //    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width()-1,data_runtime.view_main->height()-1);
     view_title->setSceneRect(-view_title->width()/2,-view_title->height()/2,view_title->width(),view_title->height());

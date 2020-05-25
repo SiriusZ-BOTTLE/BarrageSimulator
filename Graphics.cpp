@@ -10,22 +10,27 @@ void GraphicsView::mouseMoveEvent(QMouseEvent *event)
 
 void GraphicsView::mousePressEvent(QMouseEvent *event)
 {
-    qDebug()<<"press";
+//    qDebug()<<"press";
     event->ignore();
 }
 
 void GraphicsView::mouseReleaseEvent(QMouseEvent *event)
 {
-    qDebug()<<"release";
+//    qDebug()<<"release";
     event->ignore();
 }
 
+void GraphicsView::wheelEvent(QWheelEvent *event)
+{
+    event->accept();//忽略事件
+}
 
 
 ///绘制背景
 void GraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
     rect_exposed=rect;
+    qDebug()<<rect_exposed;
     static int count;
     const auto& rect_scene=this->sceneRect();
 

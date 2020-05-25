@@ -32,8 +32,8 @@
                 "position":[-1.0,-1.0],
                 "requirement_time":50,
                 "requirement_score":0,
-                "number":1,
-                "interval":5,
+                "number":200,
+                "interval":2,
                 "name_object":"block_zero_red",
                 "rotation":-1
             },

@@ -478,6 +478,8 @@ namespace Core
         void add_sub_objects(FlyingObject *obj_sub);
         //初始化
         void initialize();
+        //获取引用
+        Element & element_reference();
     };
 
 

@@ -22,6 +22,10 @@ public:
 
     void mouseReleaseEvent(QMouseEvent *event) override;
 
+    //滚轮事件
+    void wheelEvent(QWheelEvent *event) override;
+
+
 //    void paintEvent(QPaintEvent *event) override;
 
 //    void drawForeground(QPainter *painter, const QRectF &rect) override;
