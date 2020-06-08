@@ -74,6 +74,7 @@ signals:
 
 };
 
+///音频控制
 class AudiosControl: public QObject
 {
     Q_OBJECT

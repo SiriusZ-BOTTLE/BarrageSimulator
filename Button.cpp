@@ -32,7 +32,6 @@ void Button::initialize()
     void (QSound::*p_f2)();
     p_f2=&QSound::play;
 
-
     //连接信号槽
     if(Button::sound_hover)
         connect(this,&Button::hovered,sound_hover,static_cast<void (QSoundEffect::*)()>(&QSoundEffect::play));
