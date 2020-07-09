@@ -109,12 +109,12 @@ void init_block_zero_blue()
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
 //    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
-    tmp.property_gaming.team=InnerTeam::PlayerTeam;//队伍
-    tmp.property_gaming.damage=5;//碰撞伤害
-    tmp.property_gaming.resist=10;//抵抗
-    tmp.property_gaming.endurance={100,100};//耐久
-    tmp.property_gaming.penetrability=0;//穿透
-    tmp.property_gaming.flag_team_kill=false;//友伤
+    tmp.property_game.team=InnerTeam::PlayerTeam;//队伍
+    tmp.property_game.damage=5;//碰撞伤害
+    tmp.property_game.resist=10;//抵抗
+    tmp.property_game.endurance={100,100};//耐久
+    tmp.property_game.penetrability=0;//穿透
+    tmp.property_game.flag_team_kill=false;//友伤
 
     tmp.initialize();//初始化(计算一些必要数据)
 //    tmp_sub->property_gaming.
@@ -146,12 +146,12 @@ void init_bullet_type0_blue()
 //    tmp.property_gaming.index_bullet_series=0;//0系列
 //    tmp.property_gaming.index_bullet_level=0;//等级0
 
-    tmp.property_gaming.team=InnerTeam::PlayerTeam;//队伍
-    tmp.property_gaming.damage=10;//碰撞伤害
-    tmp.property_gaming.resist=100;//抵抗
-    tmp.property_gaming.endurance={100,100};//耐久
-    tmp.property_gaming.penetrability=5;//穿透
-    tmp.property_gaming.flag_team_kill=false;//友伤
+    tmp.property_game.team=InnerTeam::PlayerTeam;//队伍
+    tmp.property_game.damage=10;//碰撞伤害
+    tmp.property_game.resist=100;//抵抗
+    tmp.property_game.endurance={100,100};//耐久
+    tmp.property_game.penetrability=5;//穿透
+    tmp.property_game.flag_team_kill=false;//友伤
 
     tmp.initialize();//初始化(计算一些必要数据)
 }
@@ -180,12 +180,12 @@ void init_block_zero_red()
     tmp.property.angular_acc_max.second=0.2;//最大角加速度
 //    tmp.property.rule=&(rules_fire_inner[0][0]);//生成规则
 
-    tmp.property_gaming.team=InnerTeam::ComputerTeam;//队伍
-    tmp.property_gaming.damage=5;//碰撞伤害
-    tmp.property_gaming.resist=10;//抵抗
-    tmp.property_gaming.endurance={100,100};//耐久
-    tmp.property_gaming.penetrability=0;//穿透
-    tmp.property_gaming.flag_team_kill=false;//友伤
+    tmp.property_game.team=InnerTeam::ComputerTeam;//队伍
+    tmp.property_game.damage=5;//碰撞伤害
+    tmp.property_game.resist=10;//抵抗
+    tmp.property_game.endurance={100,100};//耐久
+    tmp.property_game.penetrability=0;//穿透
+    tmp.property_game.flag_team_kill=false;//友伤
 
     tmp.initialize();//初始化(计算一些必要数据)
 }

@@ -70,9 +70,7 @@
 
 //#pragma GCC optimize(2)
 
-/*
- *  核心头文件
- */
+///核心头文件
 //前导声明
 class ObjectsControl;
 
@@ -136,7 +134,7 @@ namespace Core
     {
         None=-1,//空
         Stop,//自动停止(立即消除加速度大小, 自动速度衰减)
-        TowardsTarget,//朝向目标(自动位移至目标位置)(暂未实现)
+        TowardsTarget,//朝向目标(自动位移至目标位置)(实现中)
         Unlimited,//无限制(使用加速度, 速度等物理量计算位置)
     };
 
@@ -150,6 +148,7 @@ namespace Core
         FollwoAcceleration,//跟随加速度(始终保持与加速度方向一致)
         TowardsMouse,//指向鼠标(自动朝向鼠标方向)
         TowardsTarget,//指向目标(自动指向目标坐标)
+        TowardsDirection,//指向方向(自动指向指定方向)
         Unlimited,//无限制(使用角加速度, 角速度等物理量计算旋转角度)
     };
 
@@ -204,6 +203,7 @@ namespace Core
         Decimal elasticity{1.0};//弹性(用于计算碰撞后轴向的动能损失, 弹性为1则不损失动能)
         BinaryVector<Decimal> coordinate{0,0};//坐标(横坐标, 纵坐标)
         BinaryVector<Decimal> target_aming{0,0};//指向目标
+//        Decimal direction_aming{0.0};//指向角度
         BinaryVector<Decimal> target_moving{0,0};//移动目标
         ///位移运动相关
         MovementMode mode_movement{MovementMode::Stop};//位移模式(默认自动停止)
@@ -212,11 +212,12 @@ namespace Core
         Decimal velocity_max{0};//最大速率限制
         Decimal acceleration_max{0};//最大加速度限制(player操纵对象运动时默认使用最大加速度进行加速)
         Decimal attenuation_velocity{0};//速度衰减(减速时的加速度大小)
-        BinaryVector<Decimal> speed_polar{0,0};//极坐标(速度大小, 速度方向)(弧度制)
+        BinaryVector<Decimal> speed_polar{0,0};//极坐标(速度方向, 速度大小)(弧度制)
         BinaryVector<Decimal> speed_axis{0,0};//轴坐标(水平速度, 垂直速度)
 
+        Decimal distance_inertia_displacement{0.0};//惯性位移距离
         //加速度
-        BinaryVector<Decimal> acceleration_polar{0,0};//极坐标(加速度大小, 加速度方向)(弧度制)
+        BinaryVector<Decimal> acceleration_polar{0,0};//极坐标(加速度方向, 加速度大小)(弧度制)
         BinaryVector<Decimal> acceleration_axis{0,0};//轴坐标(水平加速度, 垂直加速度)
 
         ///刚体(定轴)旋转相关(角度制)
@@ -239,11 +240,12 @@ namespace Core
         //计算惯性旋转角(全力减速时仍然会滑行的角度)
     private:
         void get_inertial_rotation_angle();
+        void get_inertial_movement_distance();
 
     };
     using OBP=ObjectControlProperty;
 
-    ///gaming数值属性
+    ///game数值属性
     class ObjectGamingProperty//聚合类
     {
     public:
@@ -258,21 +260,26 @@ namespace Core
     };
     using OGP=ObjectGamingProperty;
 
-    ///对象行为属性(用于AI控制)
+    ///对象行为属性(用于程序脚本控制)
     class ObjectActionProperty//聚合类
     {
-        //行文判定之后无论成功或失败都需要等待冷却
+        //行为判定之后无论成功或失败都需要等待冷却
     public:
         bool flag_player_manip{false};//玩家操纵标记,是玩家操纵单位下面所有的行为都不会生效
+        bool flag_program_manip{false};//是否由程序操纵, 非程序操纵时下面的所有行为都不会生效
         bool flag_auto_target{true};//是否自动瞄准敌方目标
         bool flag_anticipation{false};//是否进行预判
+        bool flag_can_be_locked{true};//是否能被锁定(能被自动锁定)
+        bool flag_only_file_while_locking{false};//是否仅在锁定目标时开火
 
         Decimal frequency_dodge{0.5};//闪避频率(无论是否判定成功都需要冷却)
         BinaryVector<Integer> cooldown_dodge{0,-1};//闪避冷却, 闪避周期(为负数表示没有冷却)
 
         BinaryVector<Decimal> rotate_idle{0.5,60};//随机旋转频率, 旋转程度(闲置)
+        BinaryVector<Integer> cooldown_rotate_idle{0,100};//闲置旋转冷却, 闲置周期
         BinaryVector<Decimal> move_idle{0.5,100};//随机移动频率, 移动程度(闲置)
-        BinaryVector<Integer> cooldown_idle{0,100};//闲置冷却, 闲置周期
+        BinaryVector<Integer> cooldown_move_idle{0,100};//闲置位移冷却, 闲置周期
+        Decimal float_idle_cooldown{0.0};//闲置周期浮动
 
         Decimal perception{300};//感知距离
         Decimal frequency_attack{0.5};//攻击频率(无论是否判定成功都需要冷却)
@@ -280,6 +287,7 @@ namespace Core
 
         Integer number_rest_attack{-1};//剩余攻击次数
         Integer duration_attack{50};//单次攻击的持续时间
+        Integer time_rest_on_deriving{0};//剩余处于派生对象的时间
         Decimal float_duration_attack{0.1};//持续时间波动
 
         Decimal damage_rate{1.0};//伤害倍率
@@ -363,9 +371,9 @@ namespace Core
 
         //返回一个[0,1]区间内的浮点数
         Definition::Decimal get_random_decimal_0_1();
-        //极坐标到轴坐标
+        //极坐标到轴坐标(弧度制)
         void polar_to_axis(const BinaryVector<Decimal>& polar,BinaryVector<Decimal>& axis);
-        //轴坐标到极坐标
+        //轴坐标到极坐标(弧度制)
         void axis_to_polar(const BinaryVector<Decimal>& axis,BinaryVector<Decimal>& polar);
 
         //字符串转枚举
@@ -376,6 +384,15 @@ namespace Core
 
         //字符串转枚举
         DirectionReference string_to_direction_reference(const QString &str);
+
+        //获取两个点之间的距离
+        Decimal get_distance(const BinaryVector<Decimal> &pos0,const BinaryVector<Decimal> &pos1);
+
+        //更新旋转(非线性, 考虑角加速度)
+        void update_rotation(ObjectControlProperty &pro);
+
+        //更新位置(非线性, 考虑加速度)
+        void update_position(ObjectControlProperty &pro);
 
     }
 
@@ -441,7 +458,7 @@ namespace Core
         static Integer seq;
     public:
         ObjectControlProperty property{};//基本属性(用于物理计算)
-        ObjectGamingProperty property_gaming{};//game属性(用于game逻辑计算)
+        ObjectGamingProperty property_game{};//game属性(用于game逻辑计算)
         ObjectActionProperty property_action{};//行为属性(用于AI控制)
     public:
         Integer id{0};//id号, 唯一全局标识符(执行构造函数时自动设置, 无需手动设置)
@@ -528,9 +545,12 @@ namespace Core
             //加载全部图片文件
             void load_images();
             //解析对象json文件
-            void parse_json__object(const QString &path);
+            void parse_json_object(const QString &path);
             //解析生成规则json文件
-            void parse_json__derive_rule(const QString &path);
+            void parse_json_derive_rule(const QString &path);
+        public:
+            //解析对象动作属性
+            void static parse_json_OAP(ObjectActionProperty &pro_a,const QString & path,const QJsonObject &root);
 
         };
 

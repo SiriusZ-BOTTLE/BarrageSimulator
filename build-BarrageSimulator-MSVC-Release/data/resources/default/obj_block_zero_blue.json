@@ -37,8 +37,8 @@
         "flag_team_kill":false,
         "team":1,
         "score":0,
-        "endurance":[100,100],
-        "damage":5,
+        "endurance":[500,500],
+        "damage":0,
         "resist":10,
         "penetrability":0
     }

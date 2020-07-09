@@ -3,7 +3,7 @@
     "period":0,
     "units":[
         {
-            "object":"exploding_square32",
+            "object":"exploding_square32_blue",
             "ref_direction":"Absolute",
             "ref_speed_direction":"RelativeToParentDirection",
             "ref_acc_direction":"RelativeToParentDirection",

@@ -22,6 +22,7 @@ SOURCES += \
     GamingWidget.cpp \
     Graphics.cpp \
     InnerData.cpp \
+    Strings.cpp \
     main.cpp \
     MainWindow.cpp
 
@@ -32,6 +33,7 @@ HEADERS += \
     Graphics.h \
     InnerData.h \
     MainWindow.h \
+    Strings.h \
     universal.h
 
 # Default rules for deployment.

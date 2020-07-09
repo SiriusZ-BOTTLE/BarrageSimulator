@@ -3,6 +3,7 @@ Core.o
 GamingWidget.o
 Graphics.o
 InnerData.o
+Strings.o
 main.o
 MainWindow.o
 moc_Button.o

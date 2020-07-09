@@ -12,5 +12,8 @@
 #include "MainWindow.h"
 #include "GamingWidget.h"
 
+#ifdef __DBL_MAX__
+#define DBL_MAX __DBL_MAX__
+#endif
 
 #endif // USERVERSAL_H

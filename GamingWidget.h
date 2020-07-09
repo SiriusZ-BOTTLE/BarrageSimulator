@@ -6,6 +6,7 @@
 #include "InnerData.h"
 #include "Graphics.h"
 #include "Button.h"
+#include "Strings.h"
 
 
 using namespace Core;
@@ -54,7 +55,7 @@ public:
     void process_data();
     //处理碰撞
     void process_collision();
-    //管理对象对象
+    //管理对象
     void manage_objects();
     //更新属性
     void update_property();

@@ -1,0 +1,24 @@
+{
+    "id":3,
+    "period":2,
+    "units":[
+        {
+            "object":"bullet_type0_red",
+            "ref_direction":"RelativeToParentDirection",
+            "ref_speed_direction":"RelativeToParentDirection",
+            "ref_acc_direction":"RelativeToParentDirection",
+            "flag_inherit_speed":false,
+            "flag_relative_position":true,
+            "position":[0,-60.0],
+            "speed":[0,-1],
+            "acceleration":[0,-1],
+            "direction":0,
+            "float_direction":0.0,
+            "float_direction_speed":0.03,
+            "float_direction_acc":0.0,
+            "float_magnitude_speed":0.03,
+            "float_magnitude_acc":0.0,
+            "probability":1.0
+        }
+    ]
+}

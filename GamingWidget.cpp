@@ -17,11 +17,13 @@ void ObjectsControl::process_data()
 //    Integer time_equation=0;//解方程时间(时间消耗非常小, 忽略不计)
 //    Integer time_get_list=0;//获取碰撞列表时间(时间消耗非常大, 占据总体时间消耗的99%)
 
-    auto size=data_runtime.list_objects.size();
+    const auto size=data_runtime.list_objects.size();
 
-    ///物理计算
+    ///一些物理计算
     for (int index = 0; index < size; ++index)
     {
+
+
 
         auto start0 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
 
@@ -32,7 +34,7 @@ void ObjectsControl::process_data()
         auto &acc_p = pro.acceleration_polar;   //加速度_极坐标
         auto &acc_a = pro.acceleration_axis;    //加速度_轴坐标
         auto &v_p = pro.speed_polar;            //速度_极坐标
-        auto &v_a = pro.speed_axis;             //加速度_轴坐标
+        auto &v_a = pro.speed_axis;             //速度_轴坐标
         auto &pos = pro.coordinate;             //位置
         auto &att_v = pro.attenuation_velocity; //速度衰减
         auto &pos_mouse = data_runtime.pos_mouse_scene;//鼠标位置
@@ -40,45 +42,62 @@ void ObjectsControl::process_data()
         //        emit push_info(QString::asprintf("<acc_p> %.0f %.0f <acc_a> %.0f %.0f <v_p> %.0f %.0f <v_a> %.0f %.0f",acc_p.first,acc_p.second,acc_a.first,acc_a.second,v_p.first,v_p.second,v_a.first,v_a.second));
         //        qDebug()<<QString::asprintf("<acc_p> %f %f <acc_a> %f %f <v_p> %f %f <v_a> %f %f",acc_p.first,acc_p.second,acc_a.first,acc_a.second,v_p.first,v_p.second,v_a.first,v_a.second);
 
-        if (pro.mode_movement == MovementMode::Stop) //自动停止
+        //移动模式
+        switch(pro.mode_movement)
+        {
+        case MovementMode::Stop://自动停止
         {
             acc_a.first = acc_a.second = acc_p.first = acc_p.second = 0; //清除加速度
             v_p.second -= att_v;                                         //获取当前速度大小减去速度衰减
             if (v_p.second < 0)                                          //如果速度大小为负数
                 v_p.second = 0;                                          //设为0
-            //根据极坐标计算轴坐标速度
-            ToolFunctionsKit::polar_to_axis(v_p, v_a);
+//            //根据极坐标计算轴坐标速度
+//            ToolFunctionsKit::polar_to_axis(v_p, v_a);
 
-            //根据速度更新位置
-            pos.first += v_a.first;   //水平位移
-            pos.second += v_a.second; //垂直位移
+//            //根据速度更新位置
+//            pos.first += v_a.first;   //水平位移
+//            pos.second += v_a.second; //垂直位移
+            break;
         }
-        else if (pro.mode_movement == MovementMode::Unlimited) //无限制
+        case MovementMode::TowardsTarget://自动移动到目标位置
         {
-            //根据极坐标计算轴坐标加速度
-            ToolFunctionsKit::polar_to_axis(acc_p, acc_a);
-
-            //根据极坐标计算轴坐标速度
-            ToolFunctionsKit::polar_to_axis(v_p, v_a);
-
-            //计算加速后的轴坐标速度
-            v_a.first += acc_a.first;
-            v_a.second += acc_a.second;
-
-            //根据轴坐标更新极坐标速度
-            ToolFunctionsKit::axis_to_polar(v_a, v_p);
-
-            if (pro.velocity_max > 0 && v_p.second > pro.velocity_max) //最大速度限制
-            {
-                v_p.second = pro.velocity_max;
-                //重新计算轴坐标
-                ToolFunctionsKit::polar_to_axis(v_p, v_a);
-            }
-
-            //根据速度更新位置
-            pos.first += v_a.first;   //水平位移
-            pos.second += v_a.second; //垂直位移
+            ToolFunctionsKit::update_position(pro);
+            break;
         }
+        case MovementMode::Unlimited://无限制
+        {
+            //啥也不做
+            break;
+        }
+        case MovementMode::None:
+            break;
+        }
+
+        //-------------------------------------------通用移动计算
+        //根据极坐标加速度计算轴坐标加速度
+        ToolFunctionsKit::polar_to_axis(acc_p, acc_a);
+
+        //根据极坐标速度计算轴坐标速度
+        ToolFunctionsKit::polar_to_axis(v_p, v_a);
+
+        //计算加速后的轴坐标速度
+        v_a.first += acc_a.first;
+        v_a.second += acc_a.second;
+
+        //根据轴坐标更新极坐标速度
+        ToolFunctionsKit::axis_to_polar(v_a, v_p);
+
+        if (pro.velocity_max > 0 && v_p.second > pro.velocity_max) //最大速度限制
+        {
+            v_p.second = pro.velocity_max;
+            //重新计算轴坐标
+            ToolFunctionsKit::polar_to_axis(v_p, v_a);
+        }
+        //-------------------------------------------通用移动计算
+
+        //根据速度更新位置
+        pos.first += v_a.first;   //水平位移
+        pos.second += v_a.second; //垂直位移
 
         if (pro.flag_boundary_restriction) //边界检查
         {
@@ -111,13 +130,13 @@ void ObjectsControl::process_data()
         {
         case RotationMode::Fixed: //固定无法旋转
             break;
-        case RotationMode::FollowSpeed: //跟随速度
+        case RotationMode::FollowSpeed: //跟随速度(不再考虑碰撞)
         {
             if (pro.speed_polar.second > DBL_EPSILON || pro.speed_polar.second < -DBL_EPSILON)
                 pro.rotation.first = (pro.speed_polar.first) * R2D + pro.offset_front;
             break;
         }
-        case RotationMode::FollwoAcceleration: //跟随加速度
+        case RotationMode::FollwoAcceleration: //跟随加速度(不再考虑碰撞)
         {
             if (pro.acceleration_polar.second > DBL_EPSILON || pro.acceleration_polar.second < -DBL_EPSILON)
                 pro.rotation.first = pro.acceleration_polar.first * R2D + pro.offset_front;
@@ -128,75 +147,54 @@ void ObjectsControl::process_data()
             //将目标点设为鼠标位置
             pro.target_aming.first = pos_mouse.x();
             pro.target_aming.second = pos_mouse.y();
+            //根据目标坐标位置计算目标角度
+            pro.angular_initial_target.second = qAtan2
+                    (pro.target_aming.second - pos.second, pro.target_aming.first - pos.first) * R2D + pro.offset_front;
+            ToolFunctionsKit::update_rotation(pro);//更新
+
+            //-------------------------------------------通用角度计算
+            pro.angular_speed_max.first += pro.angular_acc_max.first;       //根据角加速度更新角速度
+            if (pro.angular_speed_max.first > pro.angular_speed_max.second) //限制角速度
+                pro.angular_speed_max.first = pro.angular_speed_max.second;
+            else if (pro.angular_speed_max.first < -pro.angular_speed_max.second)
+                pro.angular_speed_max.first = -pro.angular_speed_max.second;
+            pro.rotation.first += pro.angular_speed_max.first; //更新角度
+            //-------------------------------------------通用角度计算
+
+            break;
         }
-            [[clang::fallthrough]];
+//            [[clang::fallthrough]];
+        case RotationMode::TowardsDirection:
+        {
+            ToolFunctionsKit::update_rotation(pro);//直接更新
+
+            //-------------------------------------------通用角度计算
+            pro.angular_speed_max.first += pro.angular_acc_max.first;       //根据角加速度更新角速度
+            if (pro.angular_speed_max.first > pro.angular_speed_max.second) //限制角速度
+                pro.angular_speed_max.first = pro.angular_speed_max.second;
+            else if (pro.angular_speed_max.first < -pro.angular_speed_max.second)
+                pro.angular_speed_max.first = -pro.angular_speed_max.second;
+            pro.rotation.first += pro.angular_speed_max.first; //更新角度
+            //-------------------------------------------通用角度计算
+
+            break;
+        }
         case RotationMode::TowardsTarget: //指向目标
         {
-            //根据目标坐标位置计算目标角度
-            pro.angular_initial_target.second = qAtan2(pro.target_aming.second - pos.second, pro.target_aming.first - pos.first) * R2D + pro.offset_front;
+            //根据目标坐标位置计算目标角度(单位是角度)
+            pro.angular_initial_target.second = qAtan2
+                    (pro.target_aming.second - pos.second, pro.target_aming.first - pos.first) * R2D + pro.offset_front;
+            ToolFunctionsKit::update_rotation(pro);//更新
 
-            //获取当前角度
-            pro.rotation.first = p_crt->property.rotation.first;
+            //-------------------------------------------通用角度计算
+            pro.angular_speed_max.first += pro.angular_acc_max.first;       //根据角加速度更新角速度
+            if (pro.angular_speed_max.first > pro.angular_speed_max.second) //限制角速度
+                pro.angular_speed_max.first = pro.angular_speed_max.second;
+            else if (pro.angular_speed_max.first < -pro.angular_speed_max.second)
+                pro.angular_speed_max.first = -pro.angular_speed_max.second;
+            pro.rotation.first += pro.angular_speed_max.first; //更新角度
+            //-------------------------------------------通用角度计算
 
-            //将两个角度转换为区间[0,360]内的等效值
-            while (pro.angular_initial_target.second > 360)
-                pro.angular_initial_target.second -= 360;
-            while (pro.angular_initial_target.second < 0)
-                pro.angular_initial_target.second += 360;
-            while (pro.rotation.first > 360)
-                pro.rotation.first -= 360;
-            while (pro.rotation.first < 0)
-                pro.rotation.first += 360;
-
-            //获取正向旋转时的差值
-            Decimal angle_forward = pro.angular_initial_target.second - pro.rotation.first;
-            Decimal angle_backward;
-            //获取正向负向的偏移角度
-            if (angle_forward > 0)
-                angle_backward = 360 - angle_forward;
-            else
-            {
-                angle_backward = -angle_forward;
-                angle_forward = 360 - angle_backward;
-            }
-            //剩余最小角距离
-            Decimal offsest_min = angle_forward < angle_backward ? angle_forward : angle_backward;
-
-            bool flag_forward = false;
-
-            if (angle_forward < angle_backward)
-            {
-                flag_forward = true;
-                offsest_min = angle_forward;
-            }
-            else
-                offsest_min = angle_backward;
-
-            //在惯性角度内
-            if (offsest_min < pro.rotation.second) //持续减速直到抵达目标
-            {
-                //计算剩余时间
-                auto t = qSqrt(2 * offsest_min / pro.angular_acc_max.second);
-                pro.angular_speed_max.first = pro.angular_acc_max.second * t;
-
-                if (offsest_min < pro.angular_acc_max.second) //达到临界值
-                {
-                    pro.angular_speed_max.first = 0; //设置角速度=0
-                }
-                if (!flag_forward)
-                    pro.angular_speed_max.first = -pro.angular_speed_max.first;
-            }
-            else //持续加速直到满速
-            {
-                pro.angular_speed_max.first += pro.angular_acc_max.second;      //根据角加速度更新角速度
-                if (pro.angular_speed_max.first > pro.angular_speed_max.second) //限制角速度
-                    pro.angular_speed_max.first = pro.angular_speed_max.second;
-                else if (pro.angular_speed_max.first < -pro.angular_speed_max.second)
-                    pro.angular_speed_max.first = -pro.angular_speed_max.second;
-            }
-            //            qDebug()<<pro.angular_speed_max.first;
-            pro.rotation.first += pro.angular_speed_max.first; //根据角速度更新角度
-                                                               //            qDebug()<<pro.rotation.first;
             break;
         }
         case RotationMode::Stop: //自动停止旋转
@@ -211,23 +209,164 @@ void ObjectsControl::process_data()
         }
         case RotationMode::Unlimited: //无限制
         {
+            //-------------------------------------------通用角度计算
             pro.angular_speed_max.first += pro.angular_acc_max.first;       //根据角加速度更新角速度
             if (pro.angular_speed_max.first > pro.angular_speed_max.second) //限制角速度
                 pro.angular_speed_max.first = pro.angular_speed_max.second;
             else if (pro.angular_speed_max.first < -pro.angular_speed_max.second)
                 pro.angular_speed_max.first = -pro.angular_speed_max.second;
             pro.rotation.first += pro.angular_speed_max.first; //更新角度
+            //-------------------------------------------通用角度计算
+
             break;
         }
+        case RotationMode::None:
+            break;
         }
 
+
+
+
+        //获取行为属性的引用
+        auto &pro_a=p_crt->property_action;
+
+//        qDebug()<<pro_a.flag_player_manip;
+
+        ///对象行为脚本控制
+
+        //跳过玩家当前操纵的对象和行为不受控制的对象
+        if(pro_a.flag_player_manip||(!pro_a.flag_program_manip))
+            continue;
+
+        bool flag_locking{false};//是否锁定对象
+
+        ///自动朝向不同阵营对象
+        if(pro_a.flag_auto_target)
+        {
+            //目标对象指针
+            FlyingObject * p_target{nullptr};
+
+
+            Decimal distance_min{DBL_MAX};
+            int index_min_dis{-1};
+
+            //找到感知范围内最近的敌方单位
+            for (int index = 0; index < size; ++index)
+            {
+                const auto ano=data_runtime.list_objects[index];
+
+                if(ano->property_action.flag_can_be_locked&&p_crt->property_game.team!=ano->property_game.team&&p_crt->id!=ano->id)
+                {
+                    //获取距离
+                    Decimal distance=ToolFunctionsKit::get_distance(pro.coordinate,ano->property.coordinate);
+                    if(distance<distance_min&&distance<pro_a.perception)
+                    {
+                        distance_min=distance;
+                        index_min_dis=index;
+                    }
+                }
+            }
+            //设置是否锁定
+            flag_locking=(index_min_dis>=0);
+
+            //是否预判
+            if(pro_a.flag_anticipation)
+            {
+                //目标速度(极坐标)
+                BinaryVector<Decimal> speed_polar_tgt;
+            }
+            else
+            {
+                if(!(index_min_dis<0))
+                {
+                    pro.mode_rotation=RotationMode::TowardsTarget;
+                    pro.target_aming=data_runtime.list_objects[index_min_dis]->property.coordinate;
+                }
+
+            }
+
+        }
+
+
+        ///随机转向
+        if(pro_a.cooldown_rotate_idle.first==0)
+        {
+            if(!flag_locking)//锁定目标时不随机转向
+            {
+                //重置冷却时间
+                pro_a.cooldown_rotate_idle.first=pro_a.cooldown_rotate_idle.second*(1+2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.float_idle_cooldown);
+                if(ToolFunctionsKit::get_random_decimal_0_1()<pro_a.rotate_idle.first)//判定
+                {
+                    pro.mode_rotation=RotationMode::TowardsDirection;
+                    //计算目标角度
+                    pro.angular_initial_target.second=pro.rotation.first+(2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.rotate_idle.second);
+                }
+            }
+        }
+        else
+            --pro_a.cooldown_rotate_idle.first;
+
+        ///随机位移
+        if(pro_a.cooldown_move_idle.first==0)
+        {
+            //重置冷却时间
+            pro_a.cooldown_move_idle.first=pro_a.cooldown_move_idle.second*(1+2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.float_idle_cooldown);
+            if(ToolFunctionsKit::get_random_decimal_0_1()<pro_a.move_idle.first)//判定
+            {
+                pro.mode_movement=MovementMode::TowardsTarget;
+                BinaryVector <Decimal> vec;//向量(极坐标)
+                //随机方向
+                vec.first=ToolFunctionsKit::get_random_decimal_0_1()*2*PI;
+                //随机距离
+                vec.second=ToolFunctionsKit::get_random_decimal_0_1()*pro_a.move_idle.second;
+
+                //极坐标向量转轴坐标向量
+                ToolFunctionsKit::polar_to_axis(vec,vec);
+
+                //加上自身基础位置
+                vec.first+=pro.coordinate.first;
+                vec.second+=pro.coordinate.second;
+                pro.target_moving=vec;
+
+            }
+        }
+        else
+            --pro_a.cooldown_move_idle.first;
+
+        ///攻击
+        if(pro_a.number_rest_attack>0&&pro_a.time_rest_on_deriving==0)//检查剩余攻击次数
+        {
+
+            if(pro_a.cooldown_attack.first==0)
+            {
+                //重置冷却时间
+                pro_a.cooldown_attack.first=pro_a.cooldown_attack.second;
+                if((!pro_a.flag_only_file_while_locking||flag_locking)&&ToolFunctionsKit::get_random_decimal_0_1()<pro_a.frequency_attack)//判定
+                {
+                    --pro_a.number_rest_attack;//剩余派生次数
+                    pro.flag_drive=true;//开启派生状态
+                    pro_a.time_rest_on_deriving=pro_a.duration_attack*(1+2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.float_duration_attack);
+                }
+            }
+            else
+                --pro_a.cooldown_attack.first;//冷却时间--
+        }
+
+        if(pro_a.time_rest_on_deriving==0)
+        {
+            pro.flag_drive=false;
+        }
+        else
+            --pro_a.time_rest_on_deriving;//派生时间-1
 
 
     }
 
-
 //    qDebug()<<QString::asprintf("time_basic:%8lld | time_collision %8lld | time_get_list:%6lld | time_equation %3lld | time_total %8lld | count_collision:%3lld | time_per_collision:%f", time_basic,time_collision,time_get_list,time_equation ,time_total,count,time_collision/double(count));
-    ///AI控制
+
+
+
+
 }
 
 void ObjectsControl::process_collision()
@@ -298,8 +437,8 @@ void ObjectsControl::process_collision()
             ///处理game数据
 
             //获取game数据引用
-            auto &pro_g_crt = p_crt->property_gaming;
-            auto &pro_g_ano = p_another->property_gaming;
+            auto &pro_g_crt = p_crt->property_game;
+            auto &pro_g_ano = p_another->property_game;
 
             if((pro_g_crt.team==pro_g_ano.team&&(pro_g_crt.flag_team_kill||pro_g_ano.flag_team_kill))||pro_g_crt.team!=pro_g_ano.team)
                 //同队伍但开启了友伤 或 不同队伍
@@ -505,13 +644,13 @@ void ObjectsControl::manage_objects()
 
 
         //检查耐久
-        if((p_crt)->property_gaming.endurance.first<0)
+        if((p_crt)->property_game.endurance.first<0)
             flag_destroy=true;
 
         if(flag_destroy)//销毁对象
         {
 
-            data_runtime.score+=p_crt->property_gaming.score;//计算分数
+            data_runtime.score+=p_crt->property_game.score;//计算分数
             //销毁对象
             data_runtime.list_objects.removeAt(index); //删除元素
             if(pro.rule_on_destroy)
@@ -948,30 +1087,7 @@ void GameWidget::init_UI()
 
     ///总体样式
     this->setStyleSheet(
-        //全部
-        "QWidget { background-color:rgba(0,0,0,0.0); color: #ffffff; font-size: 20px; font-family: consolas; border-radius:6px; }"
-        "QWidget#top { background-color:#ffffff; }"
-        //暂停菜单
-        "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
-        //顶层信息面板
-        "QWidget#widget_game_info { font-size: 30px; border: 3px solid #00ff00; background-color: rgba(0,0,0,0.9); padding:5px; }"
-        "QWidget#widget_game_info > * { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
-        //面板
-        "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
-        //按钮
-        "QPushButton { background-color: rgba(0,0,0,0.6); color: #ffffff; border: 2px solid #00ff00; width: 200px; height:50px; }"
-        "QWidget:disabled { background-color: rgba(0,0,0,0.0); color: #999999; border: 2px solid #000000; }"
-        //按钮hover
-        "QPushButton::hover{ color:#000000; background-color: rgba(200,200,200,0.9); border: 2px solid #000000; }"
-        //面板下
-        "QWidget#panel > QListWidget { border: 2px solid #00ff00; }"
-        "QWidget#panel > QListWidget::item { border: 2px rgba(0,0,0,0.0); border-bottom: 2px solid #555555; margin: 10px; padding: 10px; }"
-        "QWidget#panel > QListWidget::item:selected { color: #ffffff; background-color: rgba(0,0,0,0.8); border-bottom: 2px solid #00ff00; }"
-        "QWidget#panel > QTextBrowser { border: 2px solid #00ff00; }"
-        "QWidget#panel > QPushButton { width: 400px; }"
-        "QWidget#panel > QPushButton#refresh { width:200px; border: 2px solid #000000; }"
-        //label背景色
-        "QWidget QLabel#title{ background-color: rgba(0,0,0,0.8); color: #ffffff; padding:10px; }"
+        Strings::qss_main
     );
 
     ///标题页
@@ -1121,7 +1237,7 @@ void GameWidget::init_UI()
     widget_menu->raise();           //置于顶层
     widget_menu->setObjectName("widget_menu");
 
-    qDebug()<<widget_menu->windowOpacity();
+//    qDebug()<<widget_menu->windowOpacity();
 
     ///game_info页
     widget_game_info->setLayout(layout_widget_game_info);
@@ -1778,16 +1894,17 @@ void GameWidget::update()
         if (mouse_delay > 0)
             --mouse_delay;
 
-        if(data_runtime.p1->item)
+        if(data_runtime.p1&&data_runtime.p1->item)
             data_runtime.view_main->centerOn(data_runtime.p1->item);//保持中心
 
-        this->label_game_info->setText(
-        QString::asprintf(
-                        "HP: %3.0f / %-5.0f   \nScore: %-5lld",
-                        data_runtime.p1->property_gaming.endurance.first,
-                        data_runtime.p1->property_gaming.endurance.second,
-                        data_runtime.score
-                        ));
+        if(data_runtime.p1)
+            this->label_game_info->setText(
+            QString::asprintf(
+                            "HP: %3.0f / %-5.0f   \nScore: %-5lld",
+                            data_runtime.p1->property_game.endurance.first,
+                            data_runtime.p1->property_game.endurance.second,
+                            data_runtime.score
+                            ));
     }
     key_process(); //按键处理
 
@@ -2028,10 +2145,6 @@ void GameWidget::resizeEvent(QResizeEvent *event)
     view_title->setSceneRect(-view_title->width()/2,-view_title->height()/2,view_title->width(),view_title->height());
 }
 
-//void GameWidget::moveEvent(QMoveEvent *event)
-//{
-
-//}
 
 
 

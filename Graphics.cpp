@@ -30,7 +30,7 @@ void GraphicsView::wheelEvent(QWheelEvent *event)
 void GraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
     rect_exposed=rect;
-    qDebug()<<rect_exposed;
+//    qDebug()<<rect_exposed;
     static int count;
     const auto& rect_scene=this->sceneRect();
 

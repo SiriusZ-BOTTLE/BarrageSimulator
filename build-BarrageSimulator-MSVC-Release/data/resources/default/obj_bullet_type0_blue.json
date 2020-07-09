@@ -6,7 +6,7 @@
     "center":[16,16],
     "property":
     {
-        "lifetime":200,
+        "lifetime":100,
         "channel_collision":2,
         "flag_delete_outside_scene":false,
         "flag_boundary_restriction":false,
@@ -36,8 +36,31 @@
         "team":1,
         "score":0,
         "endurance":[100,100],
-        "damage":50,
+        "damage":10,
         "resist":100,
         "penetrability":5
+    },
+    "property_action":
+    {
+        "flag_player_manip":false,
+        "flag_program_manip":false,
+        "flag_auto_target":false,
+        "flag_anticipation":false,
+        "flag_can_be_locked":false,
+        "frequency_dodge":0.0,
+        "cooldown_dodge":0,
+        "rotate_idle":[0.0,0],
+        "cooldown_rotate_idle":0,
+        "move_idle":[0.0,0],
+        "cooldown_move_idle":0,
+        "perception":0,
+        "frequency_attack":0.0,
+        "cooldown_attack":0,
+        "number_rest_attack":0,
+        "duration_attack":0,
+        "float_duration_attack":0.0,
+        "damage_rate":0.0,
+        "resist_rate":0.0,
+        "penetrability_rate":0.0
     }
 }
