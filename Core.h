@@ -152,6 +152,17 @@ namespace Core
         Unlimited,//无限制(使用角加速度, 角速度等物理量计算旋转角度)
     };
 
+    ///胜利模式
+    enum class VictoryMode
+    {
+        None=-1,//空
+        SurvivalTime,//存活时间(毫秒)
+        KillNumble,//摧毁数(个)
+        KillAll,//摧毁全部
+        KillBoss,//击败BOSS
+        Score,//得分数
+    };
+
     class DeriveRule;
 
     ///内置碰撞频道
@@ -250,6 +261,7 @@ namespace Core
     {
     public:
         bool flag_team_kill{false};//同队伍伤害
+        bool flag_kill_count{false};//算入击杀数中
         Integer team{0};//队伍, 同一队伍间默认不会造成伤害
         Integer score{0};//得分, 析构后总得分加上该值(为负数则扣分)
         BinaryVector<Decimal> endurance{0,0};//耐久/最大耐久
@@ -382,6 +394,9 @@ namespace Core
         //字符串转枚举
         RotationMode string_to_rotation_mode(const QString &str);
 
+
+        VictoryMode string_to_victory_mode(const QString &str);
+
         //字符串转枚举
         DirectionReference string_to_direction_reference(const QString &str);
 
@@ -422,6 +437,7 @@ namespace Core
         int cooldown_next_frame{0};//下一帧冷却
         int frame_current{0};//当前帧
         Decimal edge{0.0};//边缘(可能发生碰撞的最远距离)
+        Decimal radius{0.0};//半径(用于简化物理碰撞)
         QVector<QPixmap> frames{};//从原图上剪切下来的不同帧, 作为动画播放
 //        QPointF offset{0.0,0.0};//偏移量
 //        QRectF rect_bounding{};//边界矩形
@@ -584,6 +600,9 @@ namespace Core
             QString image_internal{""};//内部图片
             QString image_external{""};//外部图片
             QString name_resource{""};//使用的资源名称
+
+            VictoryMode mode_victory{VictoryMode::None};//胜利模式, 指定如何才能胜利
+            Integer value_victory{-1};//对应胜利模式下需求的值
 //            QString
 
             QPoint size{1000,1000};//场景总大小(单位: 像素)
@@ -595,7 +614,7 @@ namespace Core
             Integer index_crt_rule{0};//当前生成规则索引
 
             std::vector<rule> rules_generate;//生成规则(注意生成时只能按照顺序)
-            std::vector<Integer> rules_player;
+//            std::vector<Integer> rules_player;
 
 //            ResourcePackage pkg;//资源包
 
@@ -621,10 +640,16 @@ namespace Core
 
         Integer num_updates{0};//总数据更新数
         Integer score{0};//分数
+        Decimal time_remaining{0};//剩余时间
+        Integer count_generate{0};//生成数
+        Integer count_kill{0};//击杀数
+
+        bool flag_scene_generate_complete{false};//完成场景生成
 
         QPointF pos_mouse_scene{0,0};//场景鼠标坐标
 
-        QList<Objects::FlyingObject*> list_objects{};//对象列表, 维护所有飞行对象
+        QList<Objects::FlyingObject*> list_objects{};//对象列表, 维护飞行对象(玩家操纵的对象)
+        QList<Objects::FlyingObject*> list_objects_2{};//对象列表2, 维护飞行对象(非玩家操纵的对象)
 
         QMutex mutex{};//互斥量
         QReadWriteLock lock{};//读写锁
@@ -633,7 +658,7 @@ namespace Core
         GraphicsScene *scene_main{nullptr};//场景
         GraphicsView * view_main{nullptr};//视图
 
-        Integer index_crt_generate_rule{-1};//当前生成规则
+        Integer index_crt_generate_rule{-1};//当前生成规则(的索引)
         ///依赖数据
         ResourcePackage pkg{};//资源包
         Game::Scene scene{};//场景

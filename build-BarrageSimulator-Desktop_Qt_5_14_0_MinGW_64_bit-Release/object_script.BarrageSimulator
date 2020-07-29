@@ -1,0 +1,12 @@
+Button.o
+Core.o
+GamingWidget.o
+Graphics.o
+InnerData.o
+Strings.o
+main.o
+MainWindow.o
+moc_Button.o
+moc_GamingWidget.o
+moc_Graphics.o
+moc_MainWindow.o

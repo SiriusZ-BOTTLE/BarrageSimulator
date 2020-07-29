@@ -16,7 +16,7 @@
         "number_rest_collision":-1,
         "rule":0,
         "rule_on_collision":-1,
-        "rule_on_destroy":-1,
+        "rule_on_destroy":5,
         "mass":100.0,
         "force_mutex":0,
         "inertia_rotational":10.0,
@@ -37,7 +37,7 @@
         "flag_team_kill":false,
         "team":1,
         "score":0,
-        "endurance":[500,500],
+        "endurance":[100,100],
         "damage":0,
         "resist":10,
         "penetrability":0

@@ -37,8 +37,8 @@ class GraphicsScene : public QGraphicsScene
 {
     using QGraphicsScene::QGraphicsScene;
 public:
-    QBrush brush_internal{};//内部笔刷
-    QBrush brush_external{};//外部笔刷
+    QBrush brush_internal{};//边界内部笔刷
+    QBrush brush_external{};//边界外部笔刷
 
     QRectF rect_exposed{};//暴露的矩形
 

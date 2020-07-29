@@ -23,8 +23,6 @@ void ObjectsControl::process_data()
     for (int index = 0; index < size; ++index)
     {
 
-
-
         auto start0 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
 
         //        bool flag_max_velocity{false};//满速标记
@@ -223,7 +221,6 @@ void ObjectsControl::process_data()
         case RotationMode::None:
             break;
         }
-
 
 
 
@@ -662,6 +659,9 @@ void ObjectsControl::manage_objects()
                 continue;//跳过
             }
 
+            if(p_crt->property_game.flag_kill_count)//是否计入击杀数
+                ++data_runtime.count_kill;//击杀数+1
+
             delete p_crt->item;                         //释放场景元素
             delete p_crt;                               //释放管理对象
             --index;
@@ -693,40 +693,42 @@ void ObjectsControl::manage_objects()
 
 
     ///场景生成
-    //以下代码写得十分混乱
+    //以下代码写得十分混乱(但能用就行)
     Integer size=static_cast<Integer>(data_runtime.scene.rules_generate.size());
 
     if(cooldown>0)
         --cooldown;//降低冷却
 
     if(size==data_runtime.index_crt_generate_rule)//完成全部生成规则
-        return;
+        data_runtime.flag_scene_generate_complete=true;//标记生成完成
 
-    if(cooldown==0)
-    {
-        if(rest==0)
+    if(!data_runtime.flag_scene_generate_complete)
+        if(cooldown==0)
         {
-            ++data_runtime.index_crt_generate_rule;//下一条规则
+            if(rest==0)
+            {
+                ++data_runtime.index_crt_generate_rule;//下一条规则
 
-            if(size>data_runtime.index_crt_generate_rule)
-                unit=&data_runtime.scene.rules_generate[static_cast<size_t>(data_runtime.index_crt_generate_rule)];
-            else
+                if(size>data_runtime.index_crt_generate_rule)
+                    unit=&data_runtime.scene.rules_generate[static_cast<size_t>(data_runtime.index_crt_generate_rule)];
+                else
+                    return;
+                rest=unit->first.number;//设置(剩余)对象数量
+            }
+
+            //获取当前规则的引用
+
+            if(data_runtime.score<unit->first.requirement_score)//检查分数需求
                 return;
-            rest=unit->first.number;
+
+            if(rest>=0||(data_runtime.num_updates>=unit->first.requirement_time))
+            {
+                generate_object(unit->first,unit->second);//生成对象
+                cooldown=unit->first.interval;//设置冷却
+                --rest;//剩余-1
+                ++data_runtime.count_generate;//生成计数+1
+            }
         }
-
-        //获取当前规则的引用
-
-        if(data_runtime.score<unit->first.requirement_score)
-            return;
-
-        if(rest>=0||(data_runtime.num_updates>=unit->first.requirement_time))
-        {
-            generate_object(unit->first,unit->second);//生成对象
-            cooldown=unit->first.interval;//设置冷却
-            --rest;
-        }
-    }
 
 }
 
@@ -767,6 +769,9 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
 
         obj_new = new FlyingObject(*(unit.object)); //申请新对象
 
+        //初始角度
+        obj_new->property.rotation.first=unit.direction;
+
         obj_new->property.lifetime*=1 + (ToolFunctionsKit::get_random_decimal_0_1() - 0.5)*unit.float_lifetime*2;
 
         ///处理方向
@@ -776,7 +781,7 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
         {
         case DR::RelativeToParentDirection: //相对基对象
         {
-            obj_new->property.rotation.first = pro.rotation.first - pro.offset_front;
+            obj_new->property.rotation.first += pro.rotation.first - pro.offset_front;
             break;
         }
         case DR::RelativeToParentSpeed: //相对基对象速度
@@ -811,16 +816,15 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
             obj_new->property.coordinate.second += pro.coordinate.second;
         }
 
-
         ///处理速度
 
         bv_tmp = unit.speed;//获取规则指定的速度
-        //速度方向参照
+        ///速度方向参照
         switch (unit.ref_speed_direction)
         {
         case DR::RelativeToParentDirection: //相对基对象
         {
-            bv_tmp.first = pro.rotation.first - pro.offset_front;
+            bv_tmp.first += pro.rotation.first - pro.offset_front;
             break;
         }
         case DR::RelativeToParentSpeed: //相对基对象速度
@@ -902,10 +906,12 @@ void ObjectsControl::derive_object(const ObjectControlProperty &pro,const Derive
 void ObjectsControl::generate_object(const SceneGenerateRule &rule, const ObjectActionProperty &pro_a)
 {
     if(data_runtime.pkg.objects.find(rule.name_object)==data_runtime.pkg.objects.end())
-        throw QString::asprintf("<ERROR> cannot find object %s in pkg %s",rule.name_object.toStdString().c_str(),data_runtime.pkg.path_pkg.toStdString().c_str());
+        throw QString::asprintf("<ERROR> cannot find object %s in pkg %s <FUNC> ObjectsControl::generate_object()",rule.name_object.toStdString().c_str(),data_runtime.pkg.path_pkg.toStdString().c_str());
     auto &obj_target=data_runtime.pkg.objects[rule.name_object];//获取目标对象引用
 
     FlyingObject * obj_new=new FlyingObject(obj_target);//复制构造
+
+    obj_new->property_game.flag_kill_count=true;//场景生成单位算入击杀数
 
     //处理坐标
     if(rule.position.x()<0)//横坐标小于0, 随机放置
@@ -1005,6 +1011,9 @@ GameWidget::GameWidget(MainWindow *_main_window)
     init_signal_slots();//初始化信号槽(不包含线程信号槽)
 
     init_animation();//初始化动画
+
+    //精确定时器
+    timer.setTimerType(Qt::TimerType::PreciseTimer);
 }
 
 GameWidget::~GameWidget()
@@ -1049,6 +1058,7 @@ void GameWidget::init_components()
     layout_panel_start=new QGridLayout();
     layout_panel_log=new QGridLayout();
     layout_widget_game_info=new QGridLayout();
+    layout_panel_game_over=new QGridLayout();
 
     button_start=new Button("START");
     button_load=new Button("LOAD");
@@ -1069,6 +1079,7 @@ void GameWidget::init_components()
     label_start_page_top=new QLabel();
     label_info_page_top=new QLabel();
     label_game_info=new QLabel();
+    label_game_goal=new QLabel();
     label_game_over=new QLabel();
 
     browser_info=new QTextBrowser();
@@ -1241,17 +1252,22 @@ void GameWidget::init_UI()
 
     ///game_info页
     widget_game_info->setLayout(layout_widget_game_info);
-    widget_game_info->setGeometry(5,5,240,100);
+    widget_game_info->setGeometry(0,0,300,100);
 
 
     layout_widget_game_info->setSpacing(10);
 
     layout_widget_game_info->addWidget(label_game_info,0,0,Qt::AlignLeft);
-    layout_widget_game_info->addWidget(panel_game_over,2,0,1,4,Qt::AlignCenter);
-    layout_widget_game_info->setRowStretch(0,0);
+    layout_widget_game_info->addWidget(label_game_goal,0,1,Qt::AlignRight);
+    layout_widget_game_info->addWidget(panel_game_over,2,0,1,2/*,Qt::AlignCenter*/);
+
     layout_widget_game_info->setRowStretch(1,1);
-    layout_widget_game_info->setRowStretch(2,1);
     layout_widget_game_info->setRowStretch(3,1);
+//    layout_widget_game_info->setRowStretch(1,1);
+//    layout_widget_game_info->setRowStretch(2,1);
+//    layout_widget_game_info->setRowStretch(3,1);
+
+    panel_game_over->layout();
 
     panel_game_over->setVisible(false);//不可见
     widget_game_info->setAttribute(Qt::WA_TransparentForMouseEvents,true);//不响应鼠标
@@ -1261,6 +1277,11 @@ void GameWidget::init_UI()
     widget_game_info->raise();
     widget_game_info->setObjectName("widget_game_info");
 
+
+    panel_game_over->setLayout(layout_panel_game_over);//设置布局
+    panel_game_over->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
+
+    layout_panel_game_over->addWidget(label_game_over,0,0,1,2,Qt::AlignCenter);//居中对齐
 
 
 
@@ -1382,6 +1403,9 @@ void GameWidget::init_signal_slots()
     connect(button_exit_pause_menu, &QPushButton::clicked,this,&GameWidget::exit);
 
     connect(&control, &ObjectsControl::signal_game_over,this,&GameWidget::game_over);
+
+    //连接更新时间的信号槽
+    connect(&timer_survive_time,&QTimer::timeout,this,&GameWidget::update_goal_data);
 }
 
 void GameWidget::init_threads()
@@ -1470,6 +1494,42 @@ void GameWidget::load_audio_files()
         Button::set_click_sound(&(iter->second));//设置音效
     else
         emit signal_push_info("<WARN> No sound files found of name:"+Settings::file_sound_button_click);
+
+}
+
+
+void GameWidget::update_goal_data()
+{
+    switch(data_runtime.scene.mode_victory)
+    {
+    case VictoryMode::SurvivalTime:
+    {
+//        data_runtime.time_remaining-=Settings::interval*Settings::period_data_update;//减去时间间隔
+//        qDebug()<<info_status_bar.time_consumption;
+//        data_runtime.time_remaining-=info_status_bar.time_consumption/1000.0;
+        data_runtime.time_remaining-=Settings::interval*Settings::period_data_update;
+        this->label_game_goal->setText(QString::asprintf("Time Remaining: %03.1f",data_runtime.time_remaining/1000.0));
+
+        if(data_runtime.time_remaining<=0||(data_runtime.list_objects.size()==1&&data_runtime.flag_scene_generate_complete))
+        {
+            this->label_game_goal->setText(QString::asprintf("Time Remaining: %03.1f",0.0));
+            flag_win=true;
+            flag_game_over=true;
+            game_over();
+        }
+        break;
+    }
+    case VictoryMode::KillNumble:
+    {
+        break;
+    }
+    case VictoryMode::Score:
+    {
+        break;
+    }
+    case VictoryMode::None:
+        break;
+    }
 
 }
 
@@ -1596,6 +1656,7 @@ void GameWidget::esc()
         if(this->widget_main->currentIndex()==GamePage)
         {
             this->timer.start(); //开启计时器
+//            this->timer_survive_time.start();
             this->status=Status::Running;//状态设为运行(继续运行)
             widget_game_info->show();//隐藏
         }
@@ -1608,6 +1669,7 @@ void GameWidget::esc()
         if(this->widget_main->currentIndex()==GamePage)
         {
             this->timer.stop(); //停止计时器
+//            this->timer_survive_time.stop();
             this->status=Status::Pause;//状态设为暂停
             widget_game_info->hide();//隐藏
         }
@@ -1648,7 +1710,7 @@ void GameWidget::load_scene()
 
     try
     {
-        data_runtime.scene.set_file_path(path_scene_file);//设置场景路径
+        data_runtime.scene.set_file_path(path_scene_file);//设置场景路径(关卡文件路径)
         data_runtime.scene.load();//加载场景文件
 
         data_runtime.pkg.set_package_path(Settings::path_resource_pkg+data_runtime.scene.name_resource);
@@ -1672,13 +1734,40 @@ void GameWidget::load_scene()
 
 
 
+
+//        switch(data_runtime.scene.mode_victory)
+//        {
+//        case VictoryMode::SurvivalTime:
+//        {
+//            break;
+//        }
+//        case VictoryMode::KillNumble:
+//        {
+//            break;
+//        }
+//        case VictoryMode::Score:
+//        {
+//            break;
+//        }
+//        case VictoryMode::None:
+//            break;
+//        }
+
+        if(data_runtime.scene.mode_victory==VictoryMode::SurvivalTime)
+        {
+//            timer_survive_time.start(100);
+            data_runtime.time_remaining=data_runtime.scene.value_victory;//设置剩余时间
+//            qDebug()<<data_runtime.time_remaining;
+        }
+
+
+        data_runtime.view_main->update();
+
 //        this->view_title->setVisible(false);
 //        this->timer_title.stop();//关闭主界面
         this->status=Status::Running;
         this->timer.start(Settings::interval);
         this->widget_game_info->setVisible(true);
-
-        data_runtime.view_main->update();
 
         goto_page(GamePage);
     }
@@ -1727,10 +1816,14 @@ void GameWidget::initialize()
 
 void GameWidget::reset()
 {
+    panel_game_over->hide();
+    this->flag_game_over=false;
+    this->flag_win=false;
     this->status=Status::Over;
     this->widget_game_info->setVisible(false);
     timer.stop();//结束定时器
-    timer_title.start();
+    timer_title.start();//开启定时器
+//    timer_survive_time.stop();//结束定时器
     this->view_title->setVisible(true);
     this->clear();
 
@@ -1756,87 +1849,7 @@ void GameWidget::exec()
 void GameWidget::test()
 {
     ///测试用函数
-//    data_runtime.p1 = new FlyingObject(objects_inner[InnerObjects::Block_zero_blue]);
-//    data_runtime.p1->property.coordinate = {100, 100};
-//    data_runtime.p1->add_to_scene(scene_main);    //添加到场景
-//    data_runtime.list_objects << data_runtime.p1; //添加到对象列表中
 
-//    auto p = new FlyingObject(objects_inner[InnerObjects::Block_zero_red]);
-//    p->property.coordinate={500,200};
-//    p->add_to_scene(scene_main);    //添加到场景
-//    data_runtime.list_objects << p; //添加到对象列表中
-
-//    initialize();//初始化
-
-//    this->setVisible(true);
-
-//    Settings::reset_key_map(); //重置/初始化键位
-
-//    this->widget_main->setCurrentIndex(GamePage);
-
-
-
-//    try
-//    {
-//        ResourcePackage pkg;
-//        pkg.set_package_path("./data/resources/default");
-//        pkg.load();//加载包
-//    }
-//    catch (const QString & e)
-//    {
-//        qDebug()<<e;
-//    }
-
-//    QCoreApplication::applicationDirPath();
-
-//    QString path=/*QCoreApplication::applicationDirPath()+*/"./data/sounds/button_click.wav";
-
-////    QApplication::beep();//蜂鸣
-
-//    qDebug()<<path;
-
-//    static QSoundEffect e;
-//    static QSound s(path);
-//    e.setSource(QUrl::fromLocalFile(path));
-//    qDebug()<<e.isLoaded();
-//    qDebug()<<s.fileName();
-
-//    static bool first=true;
-
-//    if(first)
-//    {
-//        first=false;
-//    }
-//    else
-//    {
-//        e.play();
-//        s.play();
-//    }
-//    QSound::play(path);
-
-//    QFile inputFile;
-//    inputFile.setFileName("./data/sounds/button_hover.wav");
-//    inputFile.open(QIODevice::ReadOnly);
-
-//    //设置采样格式
-//    QAudioFormat audioFormat;
-//    //设置采样率
-//    audioFormat.setSampleRate(44100);
-//    //设置通道数
-//    audioFormat.setChannelCount(2);
-//    //设置采样大小，一般为8位或16位
-//    audioFormat.setSampleSize(16);
-//    //设置编码方式
-//    audioFormat.setCodec("audio/pcm");
-//    //设置字节序
-//    audioFormat.setByteOrder(QAudioFormat::LittleEndian);
-//    //设置样本数据类型
-//    audioFormat.setSampleType(QAudioFormat::UnSignedInt);
-
-//    QAudioOutput *audio = new QAudioOutput( audioFormat, nullptr);
-//    audio->start(&inputFile);
-
-//    this->widget_menu->setWindowOpacity(0.5);
     animation_menu_show_opacity->start();
 
 }
@@ -1860,7 +1873,7 @@ void GameWidget::update()
 
     info_status_bar.pos_mouse = data_runtime.view_main->pos_mouse;    //鼠标坐标
     info_status_bar.num_updates =data_runtime.num_updates;            //更新数
-    info_status_bar.num_objects = data_runtime.list_objects.size();   //对象数量
+    info_status_bar.num_objects = data_runtime.list_objects.size()+data_runtime.list_objects_2.size();   //对象数量
     data_runtime.pos_mouse_scene = data_runtime.view_main->pos_mouse; //鼠标坐标
 
     emit signal_send_status_bar_info(&this->info_status_bar); //更新状态栏信息
@@ -1905,6 +1918,8 @@ void GameWidget::update()
                             data_runtime.p1->property_game.endurance.second,
                             data_runtime.score
                             ));
+        if(!flag_game_over)
+            update_goal_data();
     }
     key_process(); //按键处理
 
@@ -1913,6 +1928,7 @@ void GameWidget::update()
 //    data_runtime.view_main->update(); //视图更新
 //    data_runtime.view_main->viewport()->update();
 //    view_main->repaint();
+
     ++data_runtime.num_updates;
 }
 
@@ -2072,7 +2088,13 @@ void GameWidget::exit()
 
 void GameWidget::game_over()
 {
+    flag_game_over=true;
     emit signal_push_info("<function called> GameWidget::game_over()");
+    if(flag_win)
+        this->label_game_over->setText("Victory!");
+    else
+        this->label_game_over->setText("Game Over. You Lose.");
+    this->panel_game_over->setVisible(true);
 }
 
 
@@ -2140,6 +2162,7 @@ void GameWidget::resizeEvent(QResizeEvent *event)
 {
     this->view_title->resize(event->size());
     this->widget_menu->resize(event->size().width()*2,event->size().height());
+    this->widget_game_info->resize(event->size());
 
 //    data_runtime.view_main->setSceneRect(0,0,data_runtime.view_main->width()-1,data_runtime.view_main->height()-1);
     view_title->setSceneRect(-view_title->width()/2,-view_title->height()/2,view_title->width(),view_title->height());

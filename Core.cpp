@@ -3,8 +3,8 @@
 
 namespace Settings
 {
-    int interval=5;//两次画面刷新之间的间隔(单位ms)(10ms更新一次)
-    Integer period_data_update=2;//周期(50ms更新一次)
+    int interval=17;//两次画面刷新之间的间隔(单位ms)(10ms更新一次)
+    Integer period_data_update=1;//周期(20ms更新一次)
     bool flag_highlight=true;//受击高亮
     Integer time_highlight=4;//高亮持续刻数
     bool flag_music=false;//音乐开关
@@ -100,6 +100,7 @@ Core::Objects::Element::Element(const Core::Objects::Element &ano)
     ,period_frame(ano.period_frame)
     ,frame_current(ano.frame_current)
     ,edge(ano.edge)
+    ,radius(ano.radius)
     ,frames(ano.frames)
 {
     this->setPixmap(ano.pixmap());
@@ -142,6 +143,8 @@ void Element::set_frames(const QPixmap &_pixmap, const int &_number_frame,const 
     Decimal v=std::abs(height-c.ry())>std::abs(c.ry())?abs(height-c.ry()):std::abs(c.ry());
     this->edge=std::sqrt(h*h+v*v);
 
+    this->radius=h<v?h:v;//碰撞半径(选择小的值)
+
     this->setPixmap(frames[frame_current]);//默认设置第一帧
     this->setOffset(-center);//中心偏移
 }
@@ -177,11 +180,17 @@ bool Core::Objects::Element::collidesWithItem(const QGraphicsItem *other, Qt::It
     QPointF tmp=this->pos()-other->pos();
     qreal tmp1=std::sqrt(tmp.rx()*tmp.rx()+tmp.ry()*tmp.ry());
 
-    if(tmp1>this->edge+p->edge)
+//    if(tmp1>this->edge+p->edge)
+//        return false;
+
+    if(tmp1>this->radius+p->radius)
         return false;
+    else
+        return true;
 
     //调用基类的实现并返回结果
-    return this->QGraphicsPixmapItem::collidesWithItem(other, mode);
+    //基类实现较复杂, 包含复杂数学图形计算,开销较大
+//    return this->QGraphicsPixmapItem::collidesWithItem(other, mode);
 }
 
 
@@ -314,13 +323,20 @@ void RunTimeData::clear()
     //析构全部对象
     for(auto p_object:this->list_objects)
         delete p_object;
+    for(auto p_object:this->list_objects_2)
+        delete p_object;
     list_objects.clear();//清空列表
+    list_objects_2.clear();
     this->p1=this->p2=nullptr;
 
     this->pkg.clear();//资源包清空
     this->scene.clear();//场景清空
     this->score=0;//重置分数
     this->num_updates=0;
+    this->time_remaining=-1;
+    this->count_generate=0;
+    this->count_kill=0;
+    this->flag_scene_generate_complete=false;
 
     this->view_main->update();//刷新
     index_crt_generate_rule=-1;
@@ -431,6 +447,23 @@ RotationMode ToolFunctionsKit::string_to_rotation_mode(const QString &str)
         return RotationMode::None;
 
 }
+
+VictoryMode ToolFunctionsKit::string_to_victory_mode(const QString &str)
+{
+    if(str=="SurvivalTime")
+        return VictoryMode::SurvivalTime;
+    else if(str=="KillNumble")
+        return VictoryMode::KillNumble;
+    else if(str=="KillAll")
+        return VictoryMode::KillAll;
+    else if(str=="KillBoss")
+        return VictoryMode::KillBoss;
+    else if(str=="Score")
+        return VictoryMode::Score;
+    else
+        return VictoryMode::None;
+}
+
 
 DirectionReference ToolFunctionsKit::string_to_direction_reference(const QString &str)
 {
@@ -1729,6 +1762,24 @@ void Scene::load()
     }
 
 
+    ///mode_victory*
+    if(root.contains("mode_victory"))
+    {
+        QJsonValue value=root.value("mode_victory");
+        if(!value.isString())
+            throw QString::asprintf("<ERROR> type of KEY \"mode_victory\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->mode_victory=ToolFunctionsKit::string_to_victory_mode(value.toString());
+    }
+
+    ///value_victory
+    if(root.contains("value_victory"))
+    {
+        QJsonValue value = root.value("value_victory");
+        if(!value.isDouble())
+           throw QString::asprintf("<ERROR> type of KEY \"value_victory\" is not correct in FILE %s",path_file.toStdString().c_str());
+        this->value_victory=value.toInt();
+    }
+
     ///rules_generate
     if(root.contains("rules_generate"))
     {
@@ -1957,21 +2008,5 @@ void ToolFunctionsKit::update_position(ObjectControlProperty &pro)
 //    pro.coordinate.second += pro.speed_axis.second; //垂直位移
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -39,7 +39,7 @@ public:
     //用于场景生成的字段
     Integer cooldown{0};//场景生成冷却
     Integer rest{0};//剩余
-    Scene::rule *unit{nullptr};//当前生成单元
+    const Scene::rule *unit{nullptr};//当前生成单元
 
     enum Status//状态
     {
@@ -67,6 +67,8 @@ private:
     void derive_object(const ObjectControlProperty &pro,const DeriveRule &rule);
     //生成对象(场景生成)
     void generate_object(const SceneGenerateRule &rule,const ObjectActionProperty &pro_a);
+
+//    void process_data(QList<Objects::FlyingObject*>& list);
 
 signals:
     void updated();//更新信号
@@ -111,6 +113,9 @@ public:
     Integer cooldown_next_data_update{0};//下一次数据更新
     Integer time_consumption_total{0};//总时间消耗
 
+    bool flag_win{false};//输赢标记
+    bool flag_game_over{false};//结束标记
+
     ///主要widget
     QStackedWidget *widget_main{nullptr};//主组件
     QWidget * widget_title{nullptr};//title页
@@ -125,7 +130,7 @@ public:
     QWidget * panel_option{nullptr};//option页面板
 
     QWidget * widget_game_info{nullptr};//游戏信息覆盖面板
-    QWidget * panel_game_over{nullptr};//游戏结束面板
+    QWidget * panel_game_over{nullptr};//游戏结束面板(输或者赢都会显示)
 
     ///标签
     QLabel * label_overlay{nullptr};//覆盖信息显示层
@@ -135,6 +140,7 @@ public:
     QLabel * label_start_page_top{nullptr};//start页顶部标签
     QLabel * label_info_page_top{nullptr};//信息显示页顶部标签
     QLabel * label_game_info{nullptr};//游戏信息
+    QLabel * label_game_goal{nullptr};//游戏目标
     QLabel * label_game_over{nullptr};//游戏结束标签
 
     QTextBrowser * browser_info{nullptr};//信息浏览器
@@ -155,7 +161,8 @@ public:
     QGridLayout * layout_panel_title{nullptr};//标题页面板布局
     QGridLayout * layout_panel_start{nullptr};//start页面板布局
     QGridLayout * layout_panel_log{nullptr};//信息页面板布局
-    QGridLayout * layout_widget_game_info{nullptr};//
+    QGridLayout * layout_widget_game_info{nullptr};//信息页
+    QGridLayout * layout_panel_game_over{nullptr};//信息页
 
     ///标题页按钮
     Button * button_start{nullptr};//start
@@ -191,6 +198,7 @@ public:
     ///定时器
     QTimer timer;//定时器
     QTimer timer_title;//标题页定时器
+    QTimer timer_survive_time;//生存时间定时器
 
     StatusBarInfo info_status_bar{};
 
@@ -252,6 +260,10 @@ private:
     void load_title_images();
     //读取音频文件
     void load_audio_files();
+    //更新目标数据(顺便检查是否赢了)
+    void update_goal_data();
+
+
 
     //按键处理
     void key_process();
@@ -311,6 +323,7 @@ public slots:
     void exit();//暂停菜单exit按钮
 
     void game_over();//游戏结束
+
 
 
 protected:

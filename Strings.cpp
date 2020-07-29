@@ -10,8 +10,9 @@ namespace Strings
     //暂停菜单
     "QWidget#widget_menu { background-color: rgba(0,0,0,0.6); }"
     //顶层信息面板
-    "QWidget#widget_game_info { font-size: 30px; border: 3px solid #ffffff; background-color: rgba(0,0,0,0.9); padding:5px; }"
-    "QWidget#widget_game_info > * { font-size: 30px; background-color: rgba(0,0,0,0.0); }"
+    "QWidget#widget_game_info { font-size: 30px; background-color: rgba(0,0,0,0.0); padding:0px; }"
+    "QWidget#widget_game_info > * { font-size: 30px; background-color: rgba(0,0,0,0.5); border: 3px solid #ffffff; }"
+    "QWidget#widget_game_info > * > * { font-size: 30px; background-color: rgba(0,0,0,0.5);  }"/*border: 3px solid #ffffff;*/
     //面板
     "QWidget#panel { background-color: rgba(0,0,0,0.8); }"
     //按钮
