@@ -41,6 +41,13 @@ void ObjectsControl::process_data()
         //        qDebug()<<QString::asprintf("<acc_p> %f %f <acc_a> %f %f <v_p> %f %f <v_a> %f %f",acc_p.first,acc_p.second,acc_a.first,acc_a.second,v_p.first,v_p.second,v_a.first,v_a.second);
 
         //移动模式
+
+        //将加速度方向弧度限制在[0, 2PI]内
+        while(acc_p.first<0)
+            acc_p.first+=2*PI;
+        while(acc_p.first>=2*PI)
+            acc_p.first-=2*PI;
+
         switch(pro.mode_movement)
         {
         case MovementMode::Stop://自动停止
@@ -49,12 +56,6 @@ void ObjectsControl::process_data()
             v_p.second -= att_v;                                         //获取当前速度大小减去速度衰减
             if (v_p.second < 0)                                          //如果速度大小为负数
                 v_p.second = 0;                                          //设为0
-//            //根据极坐标计算轴坐标速度
-//            ToolFunctionsKit::polar_to_axis(v_p, v_a);
-
-//            //根据速度更新位置
-//            pos.first += v_a.first;   //水平位移
-//            pos.second += v_a.second; //垂直位移
             break;
         }
         case MovementMode::TowardsTarget://自动移动到目标位置
@@ -72,6 +73,7 @@ void ObjectsControl::process_data()
         }
 
         //-------------------------------------------通用移动计算
+
         //根据极坐标加速度计算轴坐标加速度
         ToolFunctionsKit::polar_to_axis(acc_p, acc_a);
 
@@ -124,6 +126,17 @@ void ObjectsControl::process_data()
         ToolFunctionsKit::axis_to_polar(v_a, v_p);
 
         ///角度计算
+
+        //将两个角度转换为区间[0,360]内的等效值
+        while (pro.angular_initial_target.second > 360)
+            pro.angular_initial_target.second -= 360;
+        while (pro.angular_initial_target.second < 0)
+            pro.angular_initial_target.second += 360;
+        while (pro.rotation.first > 360)
+            pro.rotation.first -= 360;
+        while (pro.rotation.first < 0)
+            pro.rotation.first += 360;
+
         switch (pro.mode_rotation)
         {
         case RotationMode::Fixed: //固定无法旋转
@@ -307,7 +320,8 @@ void ObjectsControl::process_data()
         if(pro_a.cooldown_move_idle.first==0)
         {
             //重置冷却时间
-            pro_a.cooldown_move_idle.first=pro_a.cooldown_move_idle.second*(1+2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.float_idle_cooldown);
+            pro_a.cooldown_move_idle.first
+                    =pro_a.cooldown_move_idle.second*(1+2*(ToolFunctionsKit::get_random_decimal_0_1()-0.5)*pro_a.float_idle_cooldown);
             if(ToolFunctionsKit::get_random_decimal_0_1()<pro_a.move_idle.first)//判定
             {
                 pro.mode_movement=MovementMode::TowardsTarget;
@@ -324,7 +338,7 @@ void ObjectsControl::process_data()
                 vec.first+=pro.coordinate.first;
                 vec.second+=pro.coordinate.second;
                 pro.target_moving=vec;
-
+                qDebug()<<pro.target_moving;
             }
         }
         else
@@ -376,7 +390,7 @@ void ObjectsControl::process_collision()
     {
         ///坐标计算
         FlyingObject *p_crt = data_runtime.list_objects[index];//当前对象
-        auto &pro = p_crt->property;         //物理属性
+        auto &pro = p_crt->property;            //物理属性
         auto &acc_p = pro.acceleration_polar;   //加速度_极坐标
         auto &acc_a = pro.acceleration_axis;    //加速度_轴坐标
         auto &v_p = pro.speed_polar;            //速度_极坐标
@@ -419,16 +433,16 @@ void ObjectsControl::process_collision()
             radian = qAtan2(tmp1.second,tmp1.first);
 
             //检查是否与之前碰撞的对象再次碰撞(消除碰撞粘性)
-//            if(p_crt->id_last_collision==p_another->id)
-//            {
-//                flag_clear_last_collisio=false;
-//                flag_continue=true;
-//            }
-//            if(p_another->id_last_collision==p_crt->id)
-//                flag_continue=true;//跳过
+            if(p_crt->id_last_collision==p_another->id)
+            {
+                flag_clear_last_collisio=false;
+                flag_continue=true;
+            }
+            if(p_another->id_last_collision==p_crt->id)
+                flag_continue=true;//跳过
 
-//            if(!p_another->property.flag_collision)//查看是否开启碰撞标记(现在会在collideWithItem函数中检测)
-//                flag_continue=true;//没开标记跳过
+            if(!p_another->property.flag_collision)//查看是否开启碰撞标记(现在会在collideWithItem函数中检测)
+                flag_continue=true;//没开标记跳过
 
             //都是碰撞对象
             ///处理game数据
@@ -465,7 +479,6 @@ void ObjectsControl::process_collision()
             }
 
 
-
             //坐标互斥
             if((pro.flag_mutex&&p_another->property.flag_mutex)&&!(p_crt->id_penetrating==p_another->id||p_another->id_penetrating==p_crt->id))
             {
@@ -479,6 +492,11 @@ void ObjectsControl::process_collision()
                 p_crt->property.coordinate.second-=tmp2.second;
                 p_another->property.coordinate.first+=tmp2.first;
                 p_another->property.coordinate.second+=tmp2.second;
+                //也更新自动目标坐标, 避免因自动移向目标导致穿模
+                p_crt->property.target_moving.first-=tmp2.first;
+                p_crt->property.target_moving.second-=tmp2.second;
+                p_another->property.target_moving.first+=tmp2.first;
+                p_another->property.target_moving.second+=tmp2.second;
             }
 
             //速度互斥
@@ -523,9 +541,7 @@ void ObjectsControl::process_collision()
 //            qDebug()<<"<radian> "<<radian;
 //            qDebug()<<"<speed_axis> "<<tmp1<<" "<<tmp2;
 
-
             auto start2 = std::chrono::steady_clock::now();///------------------------------------------------------------------------------计时开始
-
 
             ///轴向发生正碰, 动量守恒, 动能按系数损失(解二元二次方程)
             Decimal m1=pro.mass,m2=p_another->property.mass;// m1, m2

@@ -4,23 +4,25 @@
     "name_resource":"default",
     "image_internal":"title_BG_1.png",
     "image_external":"image_outside_border.png",
-    "size":[500,500],
+    "size":[800,800],
     "pos_view":[0,0],
     "pos_initial":[0,0],
+    "mode_victory":"SurvivalTime",
+    "value_victory":40000,
     "rules_generate":
     [
         {
             "rule":
             {
                 "flag_in_viewport":false,
-                "position":[300.0,300.0],
+                "position":[1000.0,700],
                 "requirement_time":0,
                 "number":1,
                 "interval":0,
                 "name_object":"block_zero_blue",
                 "rotation":0
             },
-            "action":
+            "property_action":
             {
                 "flag_player_manip":true
             }
@@ -30,29 +32,33 @@
             {
                 "flag_in_viewport":false,
                 "position":[-1.0,-1.0],
-                "requirement_time":50,
+                "requirement_time":0,
                 "requirement_score":0,
-                "number":200,
-                "interval":2,
+                "number":1,
+                "interval":20,
                 "name_object":"block_zero_red",
                 "rotation":-1
             },
-            "action":
+            "property_action":
             {
                 "flag_player_manip":false,
+                "flag_program_manip":true,
                 "flag_auto_target":true,
-                "flag_anticipation":true,
-                "frequency_dodge":0.5,
-                "period_dodge":50,
-                "rotate_idle":[0.5,60],
-                "move_idle":[0.5,100],
-                "period_idle":100,
-                "perception":300,
-                "frequency_attack":0.5,
-                "period_attack":200,
-                "number_rest_attack":1,
-                "duration_attack":50,
-                "float_duration_attack":0.3,
+                "flag_anticipation":false,
+                "flag_only_file_while_locking":true,
+                "frequency_dodge":0.2,
+                "cooldown_dodge":20,
+                "rotate_idle":[0.3,360],
+                "cooldown_rotate_idle":40,
+                "move_idle":[1.0,600],
+                "cooldown_move_idle":500,
+                "float_idle_cooldown":0.5,
+                "perception":600,
+                "frequency_attack":0.0,
+                "cooldown_attack":50,
+                "number_rest_attack":300,
+                "duration_attack":20,
+                "float_duration_attack":0.5,
                 "damage_rate":1.0,
                 "resist_rate":1.0,
                 "penetrability_rate":1.0

@@ -35,7 +35,7 @@ namespace Settings
     int period_change_speed=500;//更换移动速度的周期
     Decimal speed_bg_moving=1.0;//背景图最大移动速度
 
-    Decimal distance_mutex=1;//互斥距离(单位: 像素)
+    Decimal distance_mutex=2;//互斥距离(单位: 像素)
 
     QMap<unsigned,Definition::Key> map_keys{};
 
@@ -180,17 +180,17 @@ bool Core::Objects::Element::collidesWithItem(const QGraphicsItem *other, Qt::It
     QPointF tmp=this->pos()-other->pos();
     qreal tmp1=std::sqrt(tmp.rx()*tmp.rx()+tmp.ry()*tmp.ry());
 
-//    if(tmp1>this->edge+p->edge)
-//        return false;
-
-    if(tmp1>this->radius+p->radius)
+    if(tmp1>this->edge+p->edge)
         return false;
-    else
-        return true;
+
+//    if(tmp1>this->radius+p->radius)
+//        return false;
+//    else
+//        return true;
 
     //调用基类的实现并返回结果
     //基类实现较复杂, 包含复杂数学图形计算,开销较大
-//    return this->QGraphicsPixmapItem::collidesWithItem(other, mode);
+    return this->QGraphicsPixmapItem::collidesWithItem(other, mode);
 }
 
 
@@ -369,17 +369,17 @@ void Core::Definition::ObjectControlProperty::get_inertial_rotation_angle()
 
 void ObjectControlProperty::get_inertial_movement_distance()
 {
-    if(this->acceleration_max<DBL_EPSILON)//如果没有加速度
+    if(this->attenuation_velocity<DBL_EPSILON)//如果没有加速度
     {
         this->distance_inertia_displacement=-1.0;//则不存在惯性位移距离
         return;
     }
     Decimal res{0};
     Decimal v{0};
-    while(v<this->velocity_max)
+    while(v<this->attenuation_velocity)
     {
         res+=v;//累计滑行距离
-        v+=this->acceleration_max;//加速
+        v+=this->attenuation_velocity;//加速
     }
     this->distance_inertia_displacement=res;//记录值
 }
@@ -1903,16 +1903,6 @@ void Scene::clear()
 
 void ToolFunctionsKit::update_rotation(ObjectControlProperty &pro)
 {
-    //将两个角度转换为区间[0,360]内的等效值
-    while (pro.angular_initial_target.second > 360)
-        pro.angular_initial_target.second -= 360;
-    while (pro.angular_initial_target.second < 0)
-        pro.angular_initial_target.second += 360;
-    while (pro.rotation.first > 360)
-        pro.rotation.first -= 360;
-    while (pro.rotation.first < 0)
-        pro.rotation.first += 360;
-
     //获取正向旋转时的差值
     Decimal angle_forward = pro.angular_initial_target.second - pro.rotation.first;
     Decimal angle_backward;
@@ -1973,40 +1963,81 @@ void ToolFunctionsKit::update_position(ObjectControlProperty &pro)
     Decimal rad = std::atan2
             (pro.target_moving.second-pro.coordinate.second,pro.target_moving.first- pro.coordinate.first);
 
-    pro.speed_polar.first=rad;//设置位移方向
+    //计算夹角
+    Decimal angle=ToolFunctionsKit::get_angle_rad(pro.speed_polar.first,rad);
 
     if(dis<pro.distance_inertia_displacement)//惯性距离内
     {
         //持续减速直到抵达目标
 
         //计算剩余时间
-        auto t = qSqrt(2 * dis / pro.acceleration_max);
+//        auto t = qSqrt(2 * dis / pro.acceleration_max);
 
-        //a*t
-        pro.speed_polar.second = pro.acceleration_max * t;
 
-        if (dis < 1)//达到临界值
+//        if(angle>PI/2||angle<-PI/2)
+//            pro.acceleration_polar.first=rad-angle;
+//        else
+//            pro.acceleration_polar.first=pro.speed_polar.first+PI/2;
+
+        //全力减速
+//        pro.acceleration_polar.first=rad+PI/2;//反向加速度
+//        pro.acceleration_polar.second=pro.attenuation_velocity;//加速度取最大值
+
+        if(pro.speed_polar.second>0)
         {
-            pro.speed_polar.second = 0; //设置速度=0
+            if(angle>PI/2||angle<-PI/2)
+                pro.acceleration_polar.first=rad-angle+PI;
+            else
+                pro.acceleration_polar.first=pro.speed_polar.first+PI;
+        }
+        else
+            pro.acceleration_polar.first=rad+PI;
+
+        pro.acceleration_polar.second=pro.acceleration_max;
+
+        if (dis < 2/*pro.acceleration_max*/)//达到临界值
+        {
+            pro.acceleration_polar.second=0;//加速度设为0
             pro.mode_movement=MovementMode::Stop;
+            pro.speed_polar.second=0;
         }
     }
-    else//持续加速直到满速
+    else//全力加速直到满速
     {
-        pro.speed_polar.second += pro.acceleration_max;      //根据加速度更新速度
-//        if (pro.speed_polar.second > pro.velocity_max) //限制速度
-//            pro.speed_polar.second = pro.velocity_max;
+//        pro.acceleration_polar.first=rad;
+        if(pro.speed_polar.second>0)
+        {
+            if(angle>PI/2||angle<-PI/2)
+                pro.acceleration_polar.first=pro.speed_polar.first+PI;
+            else
+                pro.acceleration_polar.first=rad-angle;
+        }
+        else
+            pro.acceleration_polar.first=rad;
+        pro.acceleration_polar.second=pro.acceleration_max;
     }
-    //根据速度更新位置
-
-
-    //根据极坐标速度计算轴坐标速度
-//    ToolFunctionsKit::polar_to_axis(pro.speed_polar, pro.speed_axis);
-
-//    //根据速度更新位置
-//    pro.coordinate.first += pro.speed_axis.first;   //水平位移
-//    pro.coordinate.second += pro.speed_axis.second; //垂直位移
 
 }
 
 
+
+
+Decimal ToolFunctionsKit::get_angle_rad(const Decimal &r0, const Decimal &r1)
+{
+    Decimal r=r0-r1;
+    while(r>PI)
+        r-=2*PI;
+    while(r<=-PI)
+        r+=2*PI;
+    return r;
+}
+
+Decimal ToolFunctionsKit::get_angle_deg(const Decimal &d0, const Decimal &d1)
+{
+    Decimal d=d0-d1;
+    while(d>180)
+        d-=360;
+    while(d<=-180)
+        d+=360;
+    return d;
+}

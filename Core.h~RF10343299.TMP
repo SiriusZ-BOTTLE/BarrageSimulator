@@ -408,7 +408,7 @@ namespace Core
         Decimal get_angle_rad(const Decimal& r0, const Decimal& r1);
         //获取两个角之间的夹角(角度单位)
         //返回为正则前面的值顺时针旋转得到后面的值, 为负则逆时针旋转
-        //返回值区间: [180, -180]
+        //返回值区间: [180, -PI]
         Decimal get_angle_deg(const Decimal& d0, const Decimal& d1);
 
         //更新旋转(非线性, 考虑角加速度)
